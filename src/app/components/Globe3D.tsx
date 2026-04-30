@@ -46,10 +46,10 @@ interface HoverState {
 }
 
 const GLOBE_RADIUS = 2;
-const ZOOM_MIN = 2.15;   // city-scale (was 3.2)
-const ZOOM_MAX = 9.5;
-const ZOOM_DEFAULT = 5.2;
-const ZOOM_STEP = 0.7;
+const ZOOM_MIN = 2.5;    // closest zoom (city-scale)
+const ZOOM_MAX = 10;
+const ZOOM_DEFAULT = 6;
+const ZOOM_STEP = 0.5;
 const CITY_ZOOM = 2.85;  // target z when flying to a city
 const CLUSTER_DIST = 0.8; // degrees – cluster grouping radius
 const SPREAD_DIST = 0.22; // degrees – spread radius within a cluster
@@ -212,12 +212,14 @@ function buildGeoPath(geom: GeoJSON.Geometry, projX: ProjFn, projY: ProjFn): Pat
     if (ring.length === 0) return;
     const maxRingLat = ring.reduce((m, [, lat]) => Math.max(m, lat), -Infinity);
     const isPolar = maxRingLat < -55;
-    let first = true, prevLng = 0, prevLat = 0;
-    for (const [lng, lat] of ring) {
-      const x = projX(lng), y = projY(lat);
-      if (first) { path.moveTo(x, y); first = false; }
-      else if (Math.abs(lng - prevLng) > 180) {
-        if (isPolar) {
+
+    if (isPolar) {
+      // Antarctic-style ring: detour through the south pole edge to keep the cap filled.
+      let first = true, prevLng = 0, prevLat = 0;
+      for (const [lng, lat] of ring) {
+        const x = projX(lng), y = projY(lat);
+        if (first) { path.moveTo(x, y); first = false; }
+        else if (Math.abs(lng - prevLng) > 180) {
           const W = projX(180), H = projY(-90);
           const fromRight = prevLng > 0;
           const frac = fromRight
@@ -229,11 +231,55 @@ function buildGeoPath(geom: GeoJSON.Geometry, projX: ProjFn, projY: ProjFn): Pat
           path.lineTo(fromRight ? 0 : W, H);
           path.lineTo(fromRight ? 0 : W, yEdge);
           path.lineTo(x, y);
-        } else { path.moveTo(x, y); }
-      } else { path.lineTo(x, y); }
+        } else { path.lineTo(x, y); }
+        prevLng = lng; prevLat = lat;
+      }
+      path.closePath();
+      return;
+    }
+
+    // Non-polar: split the ring at antimeridian crossings into sub-rings, each
+    // closed individually so polygons like Russia don't draw a stripe across
+    // the texture from their easternmost to their westernmost vertex.
+    const subRings: GeoJSON.Position[][] = [[]];
+    let prevLng: number | null = null, prevLat = 0;
+    for (const [lng, lat] of ring) {
+      if (prevLng !== null && Math.abs(lng - prevLng) > 180) {
+        const fromRight = prevLng > 0;
+        const denom = fromRight ? (lng + 360 - prevLng) : (lng - 360 - prevLng);
+        // Degenerate seam (both vertices exactly on the antimeridian, e.g.
+        // Fiji's [180, lat] → [-180, lat] closure in 110m TopoJSON) makes
+        // denom 0 and frac NaN. In that case, the crossing is purely along
+        // the antimeridian itself, so the split latitude is simply prevLat.
+        let latEdge: number;
+        if (denom === 0) {
+          latEdge = prevLat;
+        } else {
+          const frac = fromRight ? (180 - prevLng) / denom : (-180 - prevLng) / denom;
+          latEdge = prevLat + frac * (lat - prevLat);
+        }
+        subRings[subRings.length - 1].push([fromRight ? 180 : -180, latEdge]);
+        subRings.push([[fromRight ? -180 : 180, latEdge]]);
+      }
+      subRings[subRings.length - 1].push([lng, lat]);
       prevLng = lng; prevLat = lat;
     }
-    path.closePath();
+    // Merge the trailing sub-ring back into the leading one — the ring's implicit
+    // closure connects them on the same side of the antimeridian.
+    if (subRings.length > 1) {
+      const tail = subRings.pop()!;
+      subRings[0] = tail.concat(subRings[0]);
+    }
+    for (const sub of subRings) {
+      if (sub.length === 0) continue;
+      let first = true;
+      for (const [lng, lat] of sub) {
+        const x = projX(lng), y = projY(lat);
+        if (first) { path.moveTo(x, y); first = false; }
+        else path.lineTo(x, y);
+      }
+      path.closePath();
+    }
   };
   if (geom.type === 'Polygon') geom.coordinates.forEach(drawRing);
   else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(p => p.forEach(drawRing));
@@ -311,15 +357,26 @@ function drawCityDots(
   ctx.restore();
 }
 
-async function buildStylizedTexture(isDark: boolean, detail: TextureDetail = 'low'): Promise<HTMLCanvasElement> {
-  const W = 8192, H = 4096;
+async function buildStylizedTexture(
+  isDark: boolean,
+  detail: TextureDetail = 'low',
+  maxTextureSize = 8192,
+): Promise<HTMLCanvasElement> {
+  // Scale texture resolution with the LOD tier; clamp to the GPU's max so
+  // higher-resolution bakes don't break on devices with smaller limits.
+  const targetW =
+    detail === 'high' ? 16384 :
+    detail === 'mid'  ? 8192  :
+                        4096;
+  const W = Math.min(targetW, maxTextureSize);
+  const H = W / 2;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // Grid intervals per LOD tier
-  const minorStep = detail === 'high' ? 5 : detail === 'mid' ? 10 : 15;
-  const majorStep = detail === 'high' ? 10 : detail === 'mid' ? 20 : 30;
+  // Constant 30° graticule across all zoom tiers (no minor lines).
+  const minorStep = 30;
+  const majorStep = 30;
   // Base topology: world-atlas TopoJSON (50m for mid+high; 10m countries ~60MB is too large)
   const topoFile = detail === 'low' ? 'countries-110m.json' : 'countries-50m.json';
 
@@ -338,8 +395,8 @@ async function buildStylizedTexture(isDark: boolean, detail: TextureDetail = 'lo
     riverMajor:  detail === 'high' ? 1.6  : 3.0,
     lakeOutline: detail === 'high' ? 0.8  : 1.5,
     stateLine:   detail === 'high' ? 0.9  : 1.8,
-    border:      detail === 'high' ? 1.4  : detail === 'mid' ? 2.2  : 3.6,
-    coast:       detail === 'high' ? 2.2  : detail === 'mid' ? 3.5  : 6.4,
+    border:      detail === 'high' ? 1.4  : detail === 'mid' ? 2.2  : 1.6,
+    coast:       detail === 'high' ? 1.1  : detail === 'mid' ? 1.8  : 1.6,
   };
 
   // ── Ocean ─────────────────────────────────────────────────────────────────
@@ -414,8 +471,10 @@ async function buildStylizedTexture(isDark: boolean, detail: TextureDetail = 'lo
   ]);
 
   // ── Land / country fills (from world-atlas TopoJSON) ──────────────────────
+  let landFeatures: GeoJSON.Feature[] = [];
   try {
     const countries = feature(topology as any, (topology as any).objects.countries) as GeoJSON.FeatureCollection;
+    landFeatures = countries.features;
     const borders = mesh(topology as any, (topology as any).objects.countries, (a: any, b: any) => a !== b) as GeoJSON.MultiLineString;
     const coastline = mesh(topology as any, (topology as any).objects.land) as GeoJSON.MultiLineString;
 
@@ -522,24 +581,60 @@ async function buildStylizedTexture(isDark: boolean, detail: TextureDetail = 'lo
   }
 
   // ── Coordinate labels ─────────────────────────────────────────────────────
+  // Skip labels that fall over land so they only sit on ocean.
+  const pointInRing = (lng: number, lat: number, ring: GeoJSON.Position[]): boolean => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i] as [number, number];
+      const [xj, yj] = ring[j] as [number, number];
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  };
+  const isOnLand = (lng: number, lat: number): boolean => {
+    for (const f of landFeatures) {
+      const g = f.geometry;
+      if (!g) continue;
+      const polys: GeoJSON.Position[][][] =
+        g.type === 'Polygon' ? [g.coordinates] :
+        g.type === 'MultiPolygon' ? g.coordinates : [];
+      for (const poly of polys) {
+        if (poly.length === 0) continue;
+        if (!pointInRing(lng, lat, poly[0])) continue;
+        let inHole = false;
+        for (let h = 1; h < poly.length; h++) {
+          if (pointInRing(lng, lat, poly[h])) { inHole = true; break; }
+        }
+        if (!inHole) return true;
+      }
+    }
+    return false;
+  };
+
   ctx.save();
   const fontSize = detail === 'high' ? W * 0.004 : W * 0.0055;
   ctx.font = `${fontSize}px monospace`;
   ctx.fillStyle = isDark ? 'rgba(100,150,230,0.55)' : 'rgba(60,80,130,0.5)';
-  ctx.textAlign = 'center';
-  const lngLabelStep = detail === 'high' ? 10 : detail === 'mid' ? 20 : 30;
-  for (let lng = -170; lng <= 170; lng += lngLabelStep) {
+  // Offset labels off the gridlines so the line doesn't cut through them.
+  const labelOffset = fontSize * 0.4;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  // Constant label spacing across all zoom tiers so the meridian/parallel
+  // labels stay anchored to the same lines no matter the LOD.
+  const lngLabelStep = 30;
+  for (let lng = -150; lng <= 150; lng += lngLabelStep) {
+    if (isOnLand(lng, 0)) continue;
     const label = lng === 0 ? '0°' : lng > 0 ? `${lng}°E` : `${Math.abs(lng)}°W`;
-    ctx.fillText(label, projX(lng), projY(0) - 20);
+    ctx.fillText(label, projX(lng) + labelOffset, projY(0) - labelOffset);
   }
-  if (detail !== 'low') {
-    ctx.textAlign = 'left';
-    const latLabelStep = detail === 'high' ? 10 : 20;
-    for (let lat = -80; lat <= 80; lat += latLabelStep) {
-      if (lat === 0) continue;
-      const label = lat > 0 ? `${lat}°N` : `${Math.abs(lat)}°S`;
-      ctx.fillText(label, projX(-178), projY(lat) - 6);
-    }
+  const latLabelStep = 30;
+  for (let lat = -60; lat <= 60; lat += latLabelStep) {
+    if (lat === 0) continue;
+    if (isOnLand(-178, lat)) continue;
+    const label = lat > 0 ? `${lat}°N` : `${Math.abs(lat)}°S`;
+    ctx.fillText(label, projX(-178) + labelOffset, projY(lat) - labelOffset);
   }
   ctx.restore();
 
@@ -557,6 +652,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
 
   // Exposed so JSX can trigger fly-to without re-entering the useEffect closure
   const flyToRef = useRef<((lat: number, lng: number, zoom?: number) => void) | null>(null);
+  // True on devices without hover (phones/tablets). Used to swap the hover card
+  // into a tap-to-preview / tap-to-open card.
+  const [isTouchDevice] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(hover: none), (pointer: coarse)').matches,
+  );
 
   const themeRefs = useRef<{
     THREE: any; earthMat: any; ambientLight: any; sunLight: any;
@@ -567,6 +667,8 @@ export function Globe3D({ isDark }: Globe3DProps) {
 
   // Track current detail tier so theme swaps re-build at the correct LOD
   const detailTierRef = useRef<TextureDetail>('low');
+  // GPU max texture size, populated once the renderer is created
+  const maxTexSizeRef = useRef<number>(8192);
   // Mirror isDark into a ref so the LOD effect can read it without becoming a dep
   const isDarkRef = useRef(isDark);
   useEffect(() => { isDarkRef.current = isDark; }, [isDark]);
@@ -646,7 +748,8 @@ export function Globe3D({ isDark }: Globe3DProps) {
         color: initialDark ? 0x0b1b30 : 0xc8d8e8, specular: 0x000000, shininess: 0,
       });
       earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 72, 72), earthMat));
-      buildStylizedTexture(initialDark).then((canvas) => {
+      maxTexSizeRef.current = renderer.capabilities.maxTextureSize ?? 8192;
+      buildStylizedTexture(initialDark, 'low', maxTexSizeRef.current).then((canvas) => {
         if (!mounted) return;
         applyTexture(canvas, { THREE, earthMat, renderer });
       });
@@ -657,9 +760,9 @@ export function Globe3D({ isDark }: Globe3DProps) {
         opacity: initialDark ? 0.14 : 0.09, side: THREE.BackSide,
       });
       scene.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS * 1.055, 64, 64), atmoMat));
-      const halo1Mat = new THREE.MeshBasicMaterial({ color: 0x4488cc, transparent: true, opacity: initialDark ? 0.18 : 0, side: THREE.BackSide });
-      const halo2Mat = new THREE.MeshBasicMaterial({ color: 0x2255aa, transparent: true, opacity: initialDark ? 0.10 : 0, side: THREE.BackSide });
-      const halo3Mat = new THREE.MeshBasicMaterial({ color: 0x112244, transparent: true, opacity: initialDark ? 0.12 : 0, side: THREE.BackSide });
+      const halo1Mat = new THREE.MeshBasicMaterial({ color: 0x4488cc, transparent: true, opacity: 0.18, side: THREE.BackSide });
+      const halo2Mat = new THREE.MeshBasicMaterial({ color: 0x2255aa, transparent: true, opacity: 0.10, side: THREE.BackSide });
+      const halo3Mat = new THREE.MeshBasicMaterial({ color: 0x112244, transparent: true, opacity: 0.12, side: THREE.BackSide });
       scene.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS * 1.09, 64, 64), halo1Mat));
       scene.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS * 1.22, 64, 64), halo2Mat));
       scene.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS * 1.55, 64, 64), halo3Mat));
@@ -733,6 +836,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
       (container as any).__zoomIn = () => applyZoom(targetZ - ZOOM_STEP);
       (container as any).__zoomOut = () => applyZoom(targetZ + ZOOM_STEP);
       (container as any).__zoomReset = () => applyZoom(ZOOM_DEFAULT);
+      (container as any).__setZoom = (z: number) => applyZoom(z);
 
       // ── Interaction ──────────────────────────────────────────────────────
       const raycaster = new THREE.Raycaster();
@@ -742,6 +846,12 @@ export function Globe3D({ isDark }: Globe3DProps) {
       let currentHoveredProject: Project | null = null;
       let currentHoveredMesh: THREE.Mesh | null = null;
       let targetZ = ZOOM_DEFAULT, currentZ = ZOOM_DEFAULT;
+      // Touch devices: hover doesn't exist, so we use a tap-to-preview /
+      // tap-again-to-open flow instead of the mouse hover behavior.
+      const isTouch = typeof window !== 'undefined'
+        && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+      let lastTappedProject: Project | null = null;
+      let lastTapAt = 0;
 
       const updateHoverHighlight = (mesh: THREE.Mesh | null, project: Project | null) => {
         if (currentHoveredMesh) {
@@ -779,6 +889,9 @@ export function Globe3D({ isDark }: Globe3DProps) {
           prevX = e.clientX; prevY = e.clientY;
           return;
         }
+        // On touch devices we only update preview on tap (mouseUp), not on
+        // synthesized mousemove events that the browser fires during a tap.
+        if (isTouch) return;
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects(markerMeshes);
         if (hits.length > 0) {
@@ -798,11 +911,43 @@ export function Globe3D({ isDark }: Globe3DProps) {
         }
       };
 
-      const onMouseUp = () => {
+      const onMouseUp = (e: MouseEvent) => {
         const wasClick = dragDistance < 4;
         isDragging = false; dragDistance = 0;
         renderer.domElement.style.cursor = isMouseOver ? 'grab' : 'default';
-        if (wasClick && currentHoveredProject) navigate(`/projects/${currentHoveredProject.id}`);
+        if (!wasClick) return;
+
+        if (!isTouch) {
+          if (currentHoveredProject) navigate(`/projects/${currentHoveredProject.id}`);
+          return;
+        }
+
+        // Touch tap: raycast at the tap location to find a marker.
+        getMousePos(e);
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(markerMeshes);
+        if (hits.length > 0) {
+          const mesh = hits[0].object as THREE.Mesh;
+          const proj = mesh.userData.project as Project;
+          const label = mesh.userData.label as string | undefined;
+          const cc = mesh.userData.clusterCenter as [number, number];
+          // Second tap on the same marker → open the project.
+          if (lastTappedProject === proj) {
+            lastTappedProject = null;
+            navigate(`/projects/${proj.id}`);
+            return;
+          }
+          // First tap → highlight + show the preview card.
+          updateHoverHighlight(mesh, proj);
+          lastTappedProject = proj;
+          lastTapAt = Date.now();
+          if (mounted) setHoverState({ project: proj, label, x: e.clientX, y: e.clientY, clusterCenter: cc });
+        } else {
+          // Tap on empty globe → close any open preview.
+          lastTappedProject = null;
+          if (currentHoveredProject) updateHoverHighlight(null, null);
+          if (mounted) setHoverState(null);
+        }
       };
 
       // Double-click → fly to that project's city
@@ -819,9 +964,12 @@ export function Globe3D({ isDark }: Globe3DProps) {
       const onMouseEnter = () => { isMouseOver = true; renderer.domElement.style.cursor = 'grab'; };
       const onMouseLeave = () => {
         isMouseOver = false; isDragging = false;
+        renderer.domElement.style.cursor = 'default';
+        // On touch the synthesized mouseleave fires after each tap; keep the
+        // preview pinned so the second tap can open it.
+        if (isTouch) return;
         updateHoverHighlight(null, null);
         if (mounted) setHoverState(null);
-        renderer.domElement.style.cursor = 'default';
       };
       const onWheel = (e: WheelEvent) => {
         e.preventDefault();
@@ -902,23 +1050,23 @@ export function Globe3D({ isDark }: Globe3DProps) {
     fillLight.color.set(isDark ? 0x1a2a44 : 0xddeeff); fillLight.intensity = isDark ? 0.4 : 0.3;
     starsMat.size = isDark ? 0.08 : 0.05; starsMat.opacity = isDark ? 0.55 : 0.28; starsMat.needsUpdate = true;
     atmoMat.color.set(isDark ? 0x2255aa : 0x6699cc); atmoMat.opacity = isDark ? 0.14 : 0.09; atmoMat.needsUpdate = true;
-    halo1Mat.opacity = isDark ? 0.18 : 0; halo1Mat.needsUpdate = true;
-    halo2Mat.opacity = isDark ? 0.10 : 0; halo2Mat.needsUpdate = true;
-    halo3Mat.opacity = isDark ? 0.12 : 0; halo3Mat.needsUpdate = true;
+    halo1Mat.opacity = 0.18; halo1Mat.needsUpdate = true;
+    halo2Mat.opacity = 0.10; halo2Mat.needsUpdate = true;
+    halo3Mat.opacity = 0.12; halo3Mat.needsUpdate = true;
 
     // Rebuild texture at the current LOD tier
     const detail = detailTierRef.current;
-    buildStylizedTexture(isDark, detail).then((canvas) => {
+    buildStylizedTexture(isDark, detail, maxTexSizeRef.current).then((canvas) => {
       if (!themeRefs.current) return;
       applyTexture(canvas, { THREE, earthMat, renderer });
     });
   }, [isDark]);
 
   // ── LOD: swap texture detail level as zoom changes ─────────────────────────
-  // Thresholds (camera z): low > 4.5, mid 3.2–4.5, high < 3.2
+  // Thresholds (camera z): low 6–10, mid 3.5–6, high <3.5
   useEffect(() => {
     const newTier: TextureDetail =
-      zoomDisplay <= 3.2 ? 'high' : zoomDisplay <= 4.5 ? 'mid' : 'low';
+      zoomDisplay <= 3.5 ? 'high' : zoomDisplay <= 6 ? 'mid' : 'low';
     if (newTier === detailTierRef.current) return; // no tier change, skip
 
     // Debounce: wait for zoom to settle before re-baking the canvas
@@ -926,7 +1074,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
       const refs = themeRefs.current;
       if (!refs) return;
       detailTierRef.current = newTier;
-      buildStylizedTexture(isDarkRef.current, newTier).then((canvas) => {
+      buildStylizedTexture(isDarkRef.current, newTier, maxTexSizeRef.current).then((canvas) => {
         if (!themeRefs.current) return;
         applyTexture(canvas, refs);
       });
@@ -938,7 +1086,33 @@ export function Globe3D({ isDark }: Globe3DProps) {
   const handleZoomIn = () => (containerRef.current as any)?.__zoomIn?.();
   const handleZoomOut = () => (containerRef.current as any)?.__zoomOut?.();
   const handleZoomReset = () => (containerRef.current as any)?.__zoomReset?.();
+  const setZoomFromPointer = (clientY: number, trackEl: HTMLElement) => {
+    const rect = trackEl.getBoundingClientRect();
+    const t = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    const z = ZOOM_MIN + t * (ZOOM_MAX - ZOOM_MIN);
+    (containerRef.current as any)?.__setZoom?.(z);
+  };
+  const handleSliderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const track = e.currentTarget;
+    track.setPointerCapture(e.pointerId);
+    setZoomFromPointer(e.clientY, track);
+  };
+  const handleSliderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    setZoomFromPointer(e.clientY, e.currentTarget);
+  };
+  const handleSliderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
   const zoomPct = 1 - (zoomDisplay - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN);
+  // LOD tier boundaries expressed as percentages from the bottom of the visualizer.
+  // High lives at the top (zoomed in); low at the bottom (zoomed out).
+  const HIGH_Z = 3.5, MID_Z = 6;
+  const tierBoundary = (z: number) => (1 - (z - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100;
+  const highBottom = tierBoundary(HIGH_Z);
+  const midBottom = tierBoundary(MID_Z);
+  const currentTier: TextureDetail =
+    zoomDisplay <= HIGH_Z ? 'high' : zoomDisplay <= MID_Z ? 'mid' : 'low';
 
   const getCardPos = (x: number, y: number) => {
     const CW = 280, CH = 355, PAD = 20;
@@ -954,16 +1128,49 @@ export function Globe3D({ isDark }: Globe3DProps) {
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Zoom Controls */}
-      <div className="absolute bottom-42 right-8 z-[1100] flex flex-col items-center gap-1" style={{ userSelect: 'none' }}>
+      {/* Zoom Controls — slider doubles as the LOD tier visualizer */}
+      <div className="absolute bottom-42 right-4 z-[1100] hidden md:flex flex-col items-center gap-1" style={{ userSelect: 'none' }}>
         <button onClick={handleZoomIn} title="Zoom in"
           style={{ width: 30, height: 30, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.16)', color: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(6px)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', lineHeight: 1 }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.18)')}
           onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.35)')}>+</button>
 
-        <div style={{ width: 2, height: 52, background: 'rgba(255,255,255,0.1)', borderRadius: 2, position: 'relative', margin: '3px 0' }}>
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: `${zoomPct * 100}%`, background: 'rgba(255,255,255,0.5)', borderRadius: 2, transition: 'height 0.12s' }} />
-          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: `calc(${zoomPct * 100}% - 5px)`, width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', transition: 'bottom 0.12s' }} />
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 7, margin: '3px 0' }}>
+          {/* tick labels to the left of the merged slider/visualizer */}
+          <div style={{ position: 'relative', height: 120, width: 26, fontSize: '0.45rem', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-sans)', pointerEvents: 'none' }}>
+            {[
+              { z: ZOOM_MIN, label: ZOOM_MIN.toFixed(2) },
+              { z: HIGH_Z,   label: HIGH_Z.toFixed(1)  },
+              { z: MID_Z,    label: MID_Z.toFixed(1)   },
+              { z: ZOOM_MAX, label: ZOOM_MAX.toFixed(1) },
+            ].map(({ z, label }) => (
+              <div key={z} style={{ position: 'absolute', right: 0, bottom: `calc(${tierBoundary(z)}% - 4px)`, lineHeight: 1, textAlign: 'right' }}>{label}</div>
+            ))}
+          </div>
+
+          {/* merged slider track + LOD tier visualizer */}
+          <div
+            onPointerDown={handleSliderPointerDown}
+            onPointerMove={handleSliderPointerMove}
+            onPointerUp={handleSliderPointerUp}
+            onPointerCancel={handleSliderPointerUp}
+            title={`zoom ${zoomDisplay.toFixed(2)}`}
+            style={{ position: 'relative', width: 6, height: 120, borderRadius: 3, overflow: 'visible', cursor: 'pointer', touchAction: 'none', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(0,0,0,0.25)' }}
+          >
+            {/* tier segments */}
+            <div style={{ position: 'absolute', inset: 0, borderRadius: 2, overflow: 'hidden', pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${highBottom}%`, top: 0, background: currentTier === 'high' ? 'rgba(120,200,255,0.75)' : 'rgba(120,200,255,0.22)' }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${midBottom}%`, height: `${highBottom - midBottom}%`, background: currentTier === 'mid' ? 'rgba(255,210,120,0.75)' : 'rgba(255,210,120,0.22)' }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${midBottom}%`, background: currentTier === 'low' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.15)' }} />
+            </div>
+            {/* draggable thumb */}
+            <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: `calc(${zoomPct * 100}% - 4px)`, width: 10, height: 8, borderRadius: 2, background: 'rgba(255,255,255,0.95)', boxShadow: '0 0 4px rgba(0,0,0,0.55)', transition: 'bottom 0.12s', pointerEvents: 'none' }} />
+          </div>
+
+          {/* current-z label that tracks the thumb on the right of the bar */}
+          <div style={{ position: 'relative', height: 120, width: 26, fontSize: '0.5rem', color: 'rgba(255,255,255,0.95)', fontFamily: 'var(--font-sans)', fontWeight: 600, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', left: 0, bottom: `calc(${zoomPct * 100}% - 5px)`, lineHeight: 1, transition: 'bottom 0.12s', textShadow: '0 0 4px rgba(0,0,0,0.7)' }}>{zoomDisplay.toFixed(2)}</div>
+          </div>
         </div>
 
         <button onClick={handleZoomOut} title="Zoom out"
@@ -979,8 +1186,12 @@ export function Globe3D({ isDark }: Globe3DProps) {
 
       {/* Hover Preview Card */}
       {hoverState && (
-        <div className="fixed z-[1500] pointer-events-none" style={getCardPos(hoverState.x, hoverState.y)}>
-          <div style={{ width: 280, background: 'var(--site-surface)', border: '1px solid var(--site-border)', boxShadow: '0 12px 40px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+        <div
+          className={`fixed z-[1500] ${isTouchDevice ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          style={getCardPos(hoverState.x, hoverState.y)}
+          onClick={isTouchDevice ? () => navigate(`/projects/${hoverState.project.id}`) : undefined}
+        >
+          <div style={{ width: 280, background: 'var(--site-surface)', border: '1px solid var(--site-border)', boxShadow: '0 12px 40px rgba(0,0,0,0.22)', overflow: 'hidden', cursor: isTouchDevice ? 'pointer' : 'default' }}>
             <div style={{ height: 155, overflow: 'hidden' }}>
               <img src={hoverState.project.image} alt={hoverState.project.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
@@ -1011,7 +1222,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
               {/* Fly-to city button */}
               <button
                 className="pointer-events-auto"
-                onClick={() => flyToRef.current?.(hoverState.clusterCenter[0], hoverState.clusterCenter[1])}
+                onClick={(e) => { e.stopPropagation(); flyToRef.current?.(hoverState.clusterCenter[0], hoverState.clusterCenter[1]); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   background: 'none', border: '1px solid var(--site-border)',
@@ -1039,7 +1250,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
       )}
 
       {/* City-scale hint — visible only when very zoomed in */}
-      {zoomDisplay < 3.2 && (
+      {zoomDisplay < 3.5 && (
         <div
           className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"
           style={{

@@ -31,94 +31,109 @@ export function Landing() {
         className="absolute bottom-0 left-0 right-0 h-44 pointer-events-none z-[1000]"
         style={{
           background: `linear-gradient(to top, ${SPACE_BG} 0%, rgba(4,6,15,0.5) 60%, transparent 100%)`,
+          opacity: 0.5,
         }}
       />
 
       {/* Hero text (bottom-left) */}
-      <div className="absolute bottom-12 left-8 z-[1000] pointer-events-none">
+      <div className="absolute top-[64px] md:top-11 left-8 z-[1000] pointer-events-none">
         <p
-          className="tracking-[0.2em] uppercase mb-2"
+          className="tracking-[0.2em] leading-tight"
           style={{
             fontSize: '0.62rem',
             fontFamily: 'var(--font-sans)',
-            color: 'rgba(180,195,220,0.55)',
+            color: 'rgba(255,255,255,0.75)',
           }}
         >
-          {t.landing.subtitle}
+          {(() => {
+            const [first, ...rest] = t.landing.subtitle.split(' & ');
+            const second = rest.length ? `& ${rest.join(' & ')}` : '';
+            return (
+              <>
+                <span className="block md:inline">{first}{second ? ' ' : ''}</span>
+                {second && <span className="block md:inline">{second}</span>}
+              </>
+            );
+          })()}
         </p>
-        <h1
-          style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: 'clamp(1.8rem, 3vw, 2.5rem)',
-            fontWeight: 400,
-            lineHeight: 1.15,
-            color: '#dde4f0',
-          }}
-        >
-          {t.landing.title1}
-          <br />
-          {t.landing.title2}
-        </h1>
       </div>
 
       {/* Legend (bottom-right) — colours follow theme */}
       <div
-        className="absolute bottom-10 right-5 z-[1000] px-5 py-4 flex flex-col gap-3"
+        className="absolute bottom-10 left-5 right-5 md:left-auto z-[1000] px-0 md:px-5 py-3 md:py-4 flex flex-col gap-2 md:gap-3"
         style={{
-          background: isDark ? 'rgba(8,13,28,0.88)' : 'rgba(245,240,232,0.88)',
+          background: 'var(--legend-bg)',
           backdropFilter: 'blur(6px)',
-          border: isDark ? '1px solid rgba(30,45,80,0.7)' : '1px solid rgba(160,140,110,0.45)',
+          border: '1px solid var(--legend-border)',
         }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              background: isDark ? '#D4904A' : '#c07830',
-              transform: 'rotate(45deg)',
-              flexShrink: 0,
-              boxShadow: isDark
-                ? '0 0 0 1.5px rgba(8,13,28,0.8), 0 0 0 2.5px #D4904A'
-                : '0 0 0 1.5px rgba(245,240,232,0.8), 0 0 0 2.5px #c07830',
-            }}
-          />
-          <span
-            className="tracking-[0.1em] uppercase"
-            style={{ fontSize: '0.62rem', fontFamily: 'var(--font-sans)', color: isDark ? '#dde4f0' : '#3a2e1e' }}
-          >
-            {t.landing.arch}
-          </span>
+        {/* Row 1 — project type indicators (single row on mobile, stacked on desktop) */}
+        <div className="flex flex-row md:flex-col items-center md:items-stretch justify-between md:justify-start gap-0 md:gap-3 px-12 md:px-0">
+          <div className="flex items-center gap-3">
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                background: 'var(--legend-arch)',
+                transform: 'rotate(45deg)',
+                flexShrink: 0,
+                boxShadow: '0 0 0 1.5px var(--legend-halo), 0 0 0 2.5px var(--legend-arch)',
+              }}
+            />
+            <span
+              className="tracking-[0.1em] uppercase leading-tight"
+              style={{ fontSize: '0.62rem', fontFamily: 'var(--font-sans)', color: 'var(--legend-label)' }}
+            >
+              {(() => {
+                const [first, ...rest] = t.landing.arch.split(' ');
+                const tail = rest.join(' ');
+                return (
+                  <>
+                    <span className="block md:inline">{first}{tail ? ' ' : ''}</span>
+                    {tail && <span className="block md:inline">{tail}</span>}
+                  </>
+                );
+              })()}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: 'var(--legend-carto)',
+                flexShrink: 0,
+                boxShadow: '0 0 0 2px var(--legend-halo), 0 0 0 3.5px var(--legend-carto)',
+              }}
+            />
+            <span
+              className="tracking-[0.1em] uppercase leading-tight"
+              style={{ fontSize: '0.62rem', fontFamily: 'var(--font-sans)', color: 'var(--legend-label)' }}
+            >
+              {(() => {
+                const [first, ...rest] = t.landing.carto.split(' ');
+                const tail = rest.join(' ');
+                return (
+                  <>
+                    <span className="block md:inline">{first}{tail ? ' ' : ''}</span>
+                    {tail && <span className="block md:inline">{tail}</span>}
+                  </>
+                );
+              })()}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: isDark ? '#5A9FC4' : '#2a6e9a',
-              flexShrink: 0,
-              boxShadow: isDark
-                ? '0 0 0 2px rgba(8,13,28,0.8), 0 0 0 3.5px #5A9FC4'
-                : '0 0 0 2px rgba(245,240,232,0.8), 0 0 0 3.5px #2a6e9a',
-            }}
-          />
-          <span
-            className="tracking-[0.1em] uppercase"
-            style={{ fontSize: '0.62rem', fontFamily: 'var(--font-sans)', color: isDark ? '#dde4f0' : '#3a2e1e' }}
-          >
-            {t.landing.carto}
-          </span>
-        </div>
-
+        {/* Row 2 — instructions */}
         <div
-          className="mt-1 pt-2 tracking-[0.06em]"
+          className="tracking-[0.06em] mx-5 md:mx-0 pt-2 border-t"
           style={{
             fontSize: '0.58rem',
             fontFamily: 'var(--font-sans)',
-            color: isDark ? 'rgba(180,195,220,0.45)' : 'rgba(80,65,45,0.55)',
-            borderTop: isDark ? '1px solid rgba(30,45,80,0.6)' : '1px solid rgba(160,140,110,0.35)',
+            color: 'var(--legend-caption)',
+            borderTopColor: 'var(--legend-divider)',
           }}
         >
           {projects.length} {t.landing.legendSuffix}

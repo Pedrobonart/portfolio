@@ -12,6 +12,18 @@
   --site-surface2: #F0EEE8;
   --site-arch: #C17B3B;
   --site-carto: #3B6E8F;
+  /* ── Landing legend palette ── */
+  --legend-bg: rgba(245, 240, 232, 0.88);
+  --legend-border: rgba(160, 140, 110, 0.45);
+  --legend-halo: rgba(245, 240, 232, 0.8);
+  --legend-label: #3a2e1e;
+  --legend-caption: rgba(80, 65, 45, 0.55);
+  --legend-divider: rgba(160, 140, 110, 0.35);
+  --legend-arch: #c07830;
+  --legend-carto: #2a6e9a;
+  /* ── Mobile menu background ── */
+  --menu-bg: rgba(250, 250, 248, 0.97);
+  --menu-bg-strong: rgba(238, 238, 232, 0.97);
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);
   --card: #ffffff;
@@ -62,6 +74,18 @@
   --site-surface2: #0c1220;
   --site-arch: #d4904a;
   --site-carto: #5a9fc4;
+  /* ── Landing legend palette (dark) ── */
+  --legend-bg: rgba(8, 13, 28, 0.88);
+  --legend-border: rgba(30, 45, 80, 0.7);
+  --legend-halo: rgba(8, 13, 28, 0.8);
+  --legend-label: #dde4f0;
+  --legend-caption: rgba(180, 195, 220, 0.45);
+  --legend-divider: rgba(30, 45, 80, 0.6);
+  --legend-arch: #D4904A;
+  --legend-carto: #5A9FC4;
+  /* ── Mobile menu background (dark) ── */
+  --menu-bg: rgba(12, 12, 10, 0.97);
+  --menu-bg-strong: rgba(4, 4, 3, 0.97);
   --background: #04060f;
   --foreground: oklch(0.9 0.02 240);
   --card: #080d1c;

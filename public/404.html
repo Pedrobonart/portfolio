@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Pedro Bonilla Artigas — redirecting…</title>
+  <script>
+    // SPA fallback for GitHub Pages.
+    // Encodes the requested path into a query string and redirects to the
+    // app's index.html, where an inline script decodes it back to the real
+    // URL before React mounts. Pattern: github.com/rafgraph/spa-github-pages
+    //
+    // pathSegmentsToKeep = 1 because the site is served under /portfolio/.
+    // For a user/organization site (served at the domain root), set this to 0.
+    var pathSegmentsToKeep = 1;
+    var l = window.location;
+    l.replace(
+      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+      l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+      l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+      (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+      l.hash
+    );
+  </script>
+</head>
+<body></body>
+</html>

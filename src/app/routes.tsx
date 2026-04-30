@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Link } from 'react-router';
 import { Layout } from './components/Layout';
 import { Landing } from './pages/Landing';
 import { Projects } from './pages/Projects';
@@ -25,8 +25,8 @@ function NotFound() {
         >
           {t.notFound.message}
         </p>
-        <a
-          href="/"
+        <Link
+          to="/"
           className="underline underline-offset-4"
           style={{
             fontFamily: 'var(--font-sans)',
@@ -35,22 +35,29 @@ function NotFound() {
           }}
         >
           {t.notFound.returnHome}
-        </a>
+        </Link>
       </div>
     </div>
   );
 }
 
-export const router = createBrowserRouter([
-  {
-    path: '/',
-    Component: Layout,
-    children: [
-      { index: true, Component: Landing },
-      { path: 'projects', Component: Projects },
-      { path: 'projects/:id', Component: ProjectDetail },
-      { path: 'about', Component: About },
-      { path: '*', Component: NotFound },
-    ],
-  },
-]);
+// Match Vite's base path ('/portfolio/' in production, '/' in dev) so the
+// router resolves clean URLs like /portfolio/projects without a leading hash.
+const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+
+export const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      Component: Layout,
+      children: [
+        { index: true, Component: Landing },
+        { path: 'projects', Component: Projects },
+        { path: 'projects/:id', Component: ProjectDetail },
+        { path: 'about', Component: About },
+        { path: '*', Component: NotFound },
+      ],
+    },
+  ],
+  { basename },
+);
