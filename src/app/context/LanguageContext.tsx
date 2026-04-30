@@ -71,7 +71,7 @@ const en: Translations = {
     about: 'About',
   },
   landing: {
-    subtitle: 'Architecture & Cartography',
+    subtitle: 'Architect & Cartographer',
     title1: 'A Practice in Space',
     title2: 'and Territory',
     arch: 'Design Projects',
@@ -132,7 +132,7 @@ const es: Translations = {
     about: 'Acerca',
   },
   landing: {
-    subtitle: 'Arquitectura & Cartografía',
+    subtitle: 'Arquitecto & Cartógrafo',
     title1: 'Una Práctica en Espacio',
     title2: 'y Territorio',
     arch: 'Proyectos de diseño',
