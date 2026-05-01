@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Globe3D } from '../components/Globe3D';
@@ -10,9 +11,23 @@ export function Landing() {
   const { isDark } = useTheme();
   const { t } = useLanguage();
 
+  // Force the document/body bg to match the space-dark canvas while the
+  // landing page is mounted, so iOS rubber-band overscroll doesn't expose
+  // a light viewport above / below the globe.
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.background;
+    const prevBody = document.body.style.background;
+    document.documentElement.style.background = SPACE_BG;
+    document.body.style.background = SPACE_BG;
+    return () => {
+      document.documentElement.style.background = prevHtml;
+      document.body.style.background = prevBody;
+    };
+  }, []);
+
   return (
     <div
-      className="relative h-screen w-full overflow-hidden"
+      className="relative h-[100dvh] w-full overflow-hidden"
       style={{ background: SPACE_BG }}
     >
       {/* 3D Globe — space background always, map style follows theme */}

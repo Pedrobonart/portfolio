@@ -672,6 +672,37 @@ export function Globe3D({ isDark }: Globe3DProps) {
   // Mirror isDark into a ref so the LOD effect can read it without becoming a dep
   const isDarkRef = useRef(isDark);
   useEffect(() => { isDarkRef.current = isDark; }, [isDark]);
+  // Cache one canvas per tier+theme so revisiting a tier is instant
+  // (no GeoJSON refetch, no canvas re-rasterisation).
+  const textureCacheRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  // Track which combos are currently being built to avoid overlapping bakes.
+  const inFlightTextureRef = useRef<Set<string>>(new Set());
+
+  const getOrBuildTexture = (
+    isDarkArg: boolean,
+    detail: TextureDetail,
+  ): Promise<HTMLCanvasElement> => {
+    const key = `${detail}:${isDarkArg ? 'dark' : 'light'}`;
+    const cached = textureCacheRef.current.get(key);
+    if (cached) return Promise.resolve(cached);
+    if (inFlightTextureRef.current.has(key)) {
+      // A bake is already in progress; poll briefly until it's cached.
+      return new Promise((resolve) => {
+        const tick = () => {
+          const c = textureCacheRef.current.get(key);
+          if (c) resolve(c);
+          else setTimeout(tick, 60);
+        };
+        tick();
+      });
+    }
+    inFlightTextureRef.current.add(key);
+    return buildStylizedTexture(isDarkArg, detail, maxTexSizeRef.current).then((canvas) => {
+      textureCacheRef.current.set(key, canvas);
+      inFlightTextureRef.current.delete(key);
+      return canvas;
+    });
+  };
 
   // ── Helper: bake canvas → Three.js texture and assign to earthMat ──────────
   const applyTexture = (canvas: HTMLCanvasElement, refs: NonNullable<typeof themeRefs.current>) => {
@@ -753,14 +784,32 @@ export function Globe3D({ isDark }: Globe3DProps) {
         color: initialDark ? 0x0b1b30 : 0xc8d8e8, specular: 0x000000, shininess: 0,
       });
       earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 72, 72), earthMat));
-      // Even when the GPU reports 16384, iOS Safari can't actually keep a
-      // 16K×8K canvas + mipmaps in memory and falls back to a corrupted
-      // (striped) texture. Cap at 8K — visually indistinguishable on the
-      // sphere at the LOD distances we use.
-      maxTexSizeRef.current = Math.min(renderer.capabilities.maxTextureSize ?? 8192, 8192);
-      buildStylizedTexture(initialDark, 'low', maxTexSizeRef.current).then((canvas) => {
+      // Texture-size cap.
+      //   • Desktop: 8K. iOS Safari can't reliably hold a 16K×8K canvas +
+      //     mipmaps; the corruption shows up as a striped globe.
+      //   • Mobile / coarse-pointer devices: 4K. Cuts the GPU memory
+      //     footprint to a quarter, halves bake time, and is plenty for
+      //     the small physical screen.
+      const isMobileGPU = typeof window !== 'undefined'
+        && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+      const desktopCap = 8192;
+      const mobileCap = 4096;
+      maxTexSizeRef.current = Math.min(
+        renderer.capabilities.maxTextureSize ?? desktopCap,
+        isMobileGPU ? mobileCap : desktopCap,
+      );
+      getOrBuildTexture(initialDark, 'low').then((canvas) => {
         if (!mounted) return;
         applyTexture(canvas, { THREE, earthMat, renderer });
+        // Preload the mid tier in the background so the first zoom-in feels
+        // instant. Skip on slow / low-memory devices via requestIdleCallback,
+        // which only fires when the main thread is free.
+        const preload = () => { if (mounted) getOrBuildTexture(initialDark, 'mid'); };
+        if (typeof (window as any).requestIdleCallback === 'function') {
+          (window as any).requestIdleCallback(preload, { timeout: 5000 });
+        } else {
+          setTimeout(preload, 1500);
+        }
       });
 
       // Atmosphere + halos
@@ -1137,28 +1186,42 @@ export function Globe3D({ isDark }: Globe3DProps) {
     halo2Mat.opacity = 0.10; halo2Mat.needsUpdate = true;
     halo3Mat.opacity = 0.12; halo3Mat.needsUpdate = true;
 
-    // Rebuild texture at the current LOD tier
+    // Rebuild texture at the current LOD tier (cache-aware).
     const detail = detailTierRef.current;
-    buildStylizedTexture(isDark, detail, maxTexSizeRef.current).then((canvas) => {
+    getOrBuildTexture(isDark, detail).then((canvas) => {
+      // Bail out if the user has zoomed to a different tier or unmounted.
       if (!themeRefs.current) return;
+      if (detailTierRef.current !== detail) return;
+      if (isDarkRef.current !== isDark) return;
       applyTexture(canvas, { THREE, earthMat, renderer });
     });
   }, [isDark]);
 
   // ── LOD: swap texture detail level as zoom changes ─────────────────────────
-  // Thresholds (camera z): low 6–10, mid 3.5–6, high <3.5
+  // Thresholds (camera z): low 6–10, mid 3.5–6, high <3.5.
+  // On touch / coarse-pointer devices we skip the 'high' tier entirely — its
+  // 10m GeoJSON layers (urban areas, fine state lines) cost an extra ~5–10 MB
+  // of downloads and a heavy canvas bake we can't afford on phone memory.
   useEffect(() => {
+    const isMobileGPU = typeof window !== 'undefined'
+      && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    const highOrMid: TextureDetail = isMobileGPU ? 'mid' : 'high';
     const newTier: TextureDetail =
-      zoomDisplay <= 3.5 ? 'high' : zoomDisplay <= 6 ? 'mid' : 'low';
+      zoomDisplay <= 3.5 ? highOrMid : zoomDisplay <= 6 ? 'mid' : 'low';
     if (newTier === detailTierRef.current) return; // no tier change, skip
 
-    // Debounce: wait for zoom to settle before re-baking the canvas
+    // Debounce: wait for zoom to settle before re-baking the canvas.
+    // Cached tiers swap in instantly via getOrBuildTexture.
     const timer = setTimeout(() => {
       const refs = themeRefs.current;
       if (!refs) return;
       detailTierRef.current = newTier;
-      buildStylizedTexture(isDarkRef.current, newTier, maxTexSizeRef.current).then((canvas) => {
+      const isDarkCurrent = isDarkRef.current;
+      getOrBuildTexture(isDarkCurrent, newTier).then((canvas) => {
+        // Bail out if the user has zoomed to a different tier or theme changed.
         if (!themeRefs.current) return;
+        if (detailTierRef.current !== newTier) return;
+        if (isDarkRef.current !== isDarkCurrent) return;
         applyTexture(canvas, refs);
       });
     }, 650);

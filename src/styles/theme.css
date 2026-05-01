@@ -169,7 +169,18 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Use the site palette so the page background matches the active theme,
+       and prevent iOS rubber-band scrolling from exposing the white viewport
+       behind the layout (which otherwise appears as a band above / below the
+       globe on mobile). */
+    background: var(--site-bg);
+    overscroll-behavior: none;
+  }
+  html {
+    background: var(--site-bg);
+    /* Hide the native scroll-overflow gutter on iOS for a flush full-bleed look. */
+    overscroll-behavior: none;
   }
 
   /**

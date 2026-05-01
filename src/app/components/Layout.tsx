@@ -15,7 +15,7 @@ export function Layout() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-[100dvh]"
       style={{ background: 'var(--site-bg)', transition: 'background 0.3s' }}
     >
       {/* Navigation */}
