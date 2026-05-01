@@ -979,9 +979,20 @@ export function Globe3D({ isDark }: Globe3DProps) {
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects(markerMeshes);
 
-        if (hits.length === 0) {
-          // Tap on empty globe → close any open preview.
+        const isTouchTap = e.pointerType !== 'mouse' || isTouch;
+
+        // Touch UX: while a preview is open, any canvas tap closes it.
+        // The only way to open the project from touch is to tap the card.
+        if (isTouchTap && lastTappedProject) {
           lastTappedProject = null;
+          updateHoverHighlight(null, null);
+          if (mounted) setHoverState(null);
+          return;
+        }
+
+        if (hits.length === 0) {
+          // Tap on empty globe → close any open preview (mouse path only;
+          // touch already handled above).
           if (currentHoveredProject) updateHoverHighlight(null, null);
           if (mounted) setHoverState(null);
           return;
@@ -992,22 +1003,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
         const label = mesh.userData.label as string | undefined;
         const cc = mesh.userData.clusterCenter as [number, number];
 
-        // Second tap on the same pin → open the project.
-        if (lastTappedProject === proj) {
-          lastTappedProject = null;
-          navigate(`/projects/${proj.id}`);
-          return;
-        }
-
-        // First tap (touch / pen): fly to pin and show preview anchored above it.
-        // First tap (mouse, no hover device): same flow.
-        // First tap (mouse with hover): legacy click-to-open behaviour.
-        if (e.pointerType !== 'mouse' || isTouch) {
+        if (isTouchTap) {
+          // Tap on a pin with no open preview → fly + show preview above it.
           updateHoverHighlight(mesh, proj);
           lastTappedProject = proj;
           lastTapAt = Date.now();
-          // Anchor the pin 1/4 of the screen up from the bottom (NDC y = -0.5)
-          // so the preview card has comfortable room above it.
           flyToRef.current?.(cc[0], cc[1], CITY_ZOOM, -0.5);
           const rect = container.getBoundingClientRect();
           if (mounted) setHoverState({
@@ -1018,6 +1018,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
             y: rect.top + rect.height * 0.75,
           });
         } else {
+          // Mouse click on a hovered marker → open the project (legacy behaviour).
           navigate(`/projects/${proj.id}`);
         }
       };
