@@ -26,5 +26,4 @@ Thumbs.db
 .env.*.local
 
 # Claude / agent state
-.claude/worktrees/
-.claude/sessions/
+.claude/
