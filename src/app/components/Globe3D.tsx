@@ -831,6 +831,13 @@ export function Globe3D({ isDark }: Globe3DProps) {
       const archColor = initialDark ? 0xe8a848 : 0xc07830;
       const cartoColor = initialDark ? 0x4aaad8 : 0x2a6e9a;
       const markerObjects: Array<{ mesh: THREE.Mesh; placed: PlacedSlot }> = [];
+      // Invisible spheres around each pin act as the actual hit area for
+      // raycasting. Bigger on touch (no precise pointer) and a bit roomier
+      // on desktop so the pin is forgiving to click. The visible pin geometry
+      // (cylinder + base disk) is unchanged.
+      const pickMeshes: THREE.Mesh[] = [];
+      const tapRadius = isMobileGPU ? 0.07 : 0.018;
+      const tapMat = new THREE.MeshBasicMaterial({ visible: false });
 
       placedSlots.forEach((placed) => {
         const { project, label, lat, lng, clusterCenter } = placed;
@@ -863,9 +870,18 @@ export function Globe3D({ isDark }: Globe3DProps) {
         base.position.set(bx, by, bz);
         base.lookAt(0, 0, 0); base.rotateX(Math.PI);
         earthGroup.add(base);
+
+        // Tap/click proxy — invisible larger sphere centred on the pin.
+        const tapTarget = new THREE.Mesh(
+          new THREE.SphereGeometry(tapRadius, 8, 8),
+          tapMat,
+        );
+        tapTarget.position.set(x, y, z);
+        tapTarget.userData = { project, label, clusterCenter, actualMesh: markerMesh };
+        earthGroup.add(tapTarget);
+        pickMeshes.push(tapTarget);
       });
 
-      const markerMeshes = markerObjects.map((m) => m.mesh);
 
       // ── Fly-to state ──────────────────────────────────────────────────────
       const isFlyingRef2 = { current: false };
@@ -889,10 +905,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
         while (ryDelta < -Math.PI) ryDelta += 2 * Math.PI;
         // Convert the desired NDC y into an extra X-rotation so the target
         // lat appears off-centre on screen at the fly-target zoom.
-        // Derivation: y_ndc ≈ R·sin(δ) / (zoom − R·cos(δ)) / tan(fov/2)
-        //   → for small δ, δ ≈ y_ndc · (zoom − R) · tan(fov/2) / R
+        // A positive δ rotation around X moves the centred point to negative
+        // y in camera space → bottom of the screen — so we negate the
+        // anchor (NDC y +1 = top, -1 = bottom) when computing δ.
         const fovRad = (camera.fov * Math.PI) / 180;
-        const rxOffset = screenAnchorY * (zoom - GLOBE_RADIUS) * Math.tan(fovRad / 2) / GLOBE_RADIUS;
+        const rxOffset = -screenAnchorY * (zoom - GLOBE_RADIUS) * Math.tan(fovRad / 2) / GLOBE_RADIUS;
         flyTarget.current = { rx: rxTarget + rxOffset, ry: earthGroup.rotation.y + ryDelta };
         isFlyingRef2.current = true;
         applyZoom(zoom);
@@ -991,13 +1008,15 @@ export function Globe3D({ isDark }: Globe3DProps) {
         if (e.pointerType !== 'mouse' || isTouch) return;
         getMousePos(e);
         raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(markerMeshes);
+        const hits = raycaster.intersectObjects(pickMeshes);
         if (hits.length > 0) {
-          const proj = hits[0].object.userData.project as Project;
-          const label = hits[0].object.userData.label as string | undefined;
-          const cc = hits[0].object.userData.clusterCenter as [number, number];
+          const obj = hits[0].object;
+          const proj = obj.userData.project as Project;
+          const label = obj.userData.label as string | undefined;
+          const cc = obj.userData.clusterCenter as [number, number];
+          const visible = (obj.userData.actualMesh ?? obj) as THREE.Mesh;
           if (proj !== currentHoveredProject) {
-            updateHoverHighlight(hits[0].object as THREE.Mesh, proj);
+            updateHoverHighlight(visible, proj);
             if (mounted) setHoverState({ project: proj, label, x: e.clientX, y: e.clientY, clusterCenter: cc });
           } else {
             if (mounted) setHoverState((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
@@ -1026,7 +1045,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
         // Tap handling — raycast for a marker hit at the release position.
         getMousePos(e);
         raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(markerMeshes);
+        const hits = raycaster.intersectObjects(pickMeshes);
 
         const isTouchTap = e.pointerType !== 'mouse' || isTouch;
 
@@ -1047,10 +1066,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
           return;
         }
 
-        const mesh = hits[0].object as THREE.Mesh;
-        const proj = mesh.userData.project as Project;
-        const label = mesh.userData.label as string | undefined;
-        const cc = mesh.userData.clusterCenter as [number, number];
+        const obj = hits[0].object;
+        const proj = obj.userData.project as Project;
+        const label = obj.userData.label as string | undefined;
+        const cc = obj.userData.clusterCenter as [number, number];
+        const mesh = (obj.userData.actualMesh ?? obj) as THREE.Mesh;
 
         if (isTouchTap) {
           // Tap on a pin with no open preview → fly + show preview above it.
@@ -1082,7 +1102,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
       const onDblClick = (e: MouseEvent) => {
         getMousePos(e);
         raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(markerMeshes);
+        const hits = raycaster.intersectObjects(pickMeshes);
         if (hits.length > 0) {
           const cc = hits[0].object.userData.clusterCenter as [number, number];
           flyToRef.current?.(cc[0], cc[1]);
