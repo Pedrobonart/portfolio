@@ -867,21 +867,52 @@ export function Globe3D({ isDark }: Globe3DProps) {
         }
       };
 
-      const getMousePos = (e: MouseEvent) => {
+      const getMousePos = (e: { clientX: number; clientY: number }) => {
         const rect = container.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       };
 
-      const onMouseDown = (e: MouseEvent) => {
-        isDragging = true; prevX = e.clientX; prevY = e.clientY; dragDistance = 0;
-        isFlyingRef2.current = false; // cancel any in-progress fly
-        renderer.domElement.style.cursor = 'grabbing';
+      // ── Pointer-based input (mouse + touch + pen unified) ──────────────────
+      // Tracks active pointers for single-finger drag and two-finger pinch zoom.
+      const pointers = new Map<number, { x: number; y: number }>();
+      let pinchStartDist = 0;
+      let pinchStartZoom = 0;
+
+      const onPointerDown = (e: PointerEvent) => {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        try { renderer.domElement.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        isFlyingRef2.current = false;
+
+        if (pointers.size === 1) {
+          isDragging = true;
+          prevX = e.clientX; prevY = e.clientY; dragDistance = 0;
+          renderer.domElement.style.cursor = 'grabbing';
+        } else if (pointers.size === 2) {
+          // Two fingers down → start pinch, cancel drag detection
+          isDragging = false;
+          const pts = [...pointers.values()];
+          pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+          pinchStartZoom = targetZ;
+        }
       };
 
-      const onMouseMove = (e: MouseEvent) => {
-        getMousePos(e);
-        if (isDragging) {
+      const onPointerMove = (e: PointerEvent) => {
+        if (pointers.has(e.pointerId)) {
+          pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+
+        // Two-finger pinch zoom — pinch out (ratio > 1) → zoom in (lower z).
+        if (pointers.size === 2 && pinchStartDist > 0) {
+          const pts = [...pointers.values()];
+          const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+          const ratio = dist / pinchStartDist;
+          if (ratio > 0) applyZoom(pinchStartZoom / ratio);
+          return;
+        }
+
+        // Single-pointer drag → rotate the globe.
+        if (pointers.size === 1 && isDragging) {
           const dx = e.clientX - prevX, dy = e.clientY - prevY;
           dragDistance += Math.abs(dx) + Math.abs(dy);
           earthGroup.rotation.y += dx * 0.005;
@@ -889,9 +920,10 @@ export function Globe3D({ isDark }: Globe3DProps) {
           prevX = e.clientX; prevY = e.clientY;
           return;
         }
-        // On touch devices we only update preview on tap (mouseUp), not on
-        // synthesized mousemove events that the browser fires during a tap.
-        if (isTouch) return;
+
+        // Hover preview — mouse only (touch uses tap-to-preview on pointerUp).
+        if (e.pointerType !== 'mouse' || isTouch) return;
+        getMousePos(e);
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects(markerMeshes);
         if (hits.length > 0) {
@@ -911,43 +943,72 @@ export function Globe3D({ isDark }: Globe3DProps) {
         }
       };
 
-      const onMouseUp = (e: MouseEvent) => {
-        const wasClick = dragDistance < 4;
-        isDragging = false; dragDistance = 0;
+      const onPointerUp = (e: PointerEvent) => {
+        const wasMultiTouch = pointers.size > 1;
+        pointers.delete(e.pointerId);
+        try { renderer.domElement.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+        if (pointers.size < 2) pinchStartDist = 0;
+
+        if (pointers.size > 0) return; // still other fingers down
+
+        const wasClick = !wasMultiTouch && dragDistance < 6;
+        isDragging = false;
+        dragDistance = 0;
         renderer.domElement.style.cursor = isMouseOver ? 'grab' : 'default';
         if (!wasClick) return;
 
-        if (!isTouch) {
-          if (currentHoveredProject) navigate(`/projects/${currentHoveredProject.id}`);
-          return;
-        }
-
-        // Touch tap: raycast at the tap location to find a marker.
+        // Tap handling — raycast for a marker hit at the release position.
         getMousePos(e);
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects(markerMeshes);
-        if (hits.length > 0) {
-          const mesh = hits[0].object as THREE.Mesh;
-          const proj = mesh.userData.project as Project;
-          const label = mesh.userData.label as string | undefined;
-          const cc = mesh.userData.clusterCenter as [number, number];
-          // Second tap on the same marker → open the project.
-          if (lastTappedProject === proj) {
-            lastTappedProject = null;
-            navigate(`/projects/${proj.id}`);
-            return;
-          }
-          // First tap → highlight + show the preview card.
-          updateHoverHighlight(mesh, proj);
-          lastTappedProject = proj;
-          lastTapAt = Date.now();
-          if (mounted) setHoverState({ project: proj, label, x: e.clientX, y: e.clientY, clusterCenter: cc });
-        } else {
+
+        if (hits.length === 0) {
           // Tap on empty globe → close any open preview.
           lastTappedProject = null;
           if (currentHoveredProject) updateHoverHighlight(null, null);
           if (mounted) setHoverState(null);
+          return;
         }
+
+        const mesh = hits[0].object as THREE.Mesh;
+        const proj = mesh.userData.project as Project;
+        const label = mesh.userData.label as string | undefined;
+        const cc = mesh.userData.clusterCenter as [number, number];
+
+        // Second tap on the same pin → open the project.
+        if (lastTappedProject === proj) {
+          lastTappedProject = null;
+          navigate(`/projects/${proj.id}`);
+          return;
+        }
+
+        // First tap (touch / pen): fly to pin and show preview anchored above it.
+        // First tap (mouse, no hover device): same flow.
+        // First tap (mouse with hover): legacy click-to-open behaviour.
+        if (e.pointerType !== 'mouse' || isTouch) {
+          updateHoverHighlight(mesh, proj);
+          lastTappedProject = proj;
+          lastTapAt = Date.now();
+          flyToRef.current?.(cc[0], cc[1]);
+          // Card anchor: where the pin will end up after the fly — the centre
+          // of the canvas. The card positions itself above this point on touch.
+          const rect = container.getBoundingClientRect();
+          if (mounted) setHoverState({
+            project: proj,
+            label,
+            clusterCenter: cc,
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+          });
+        } else {
+          navigate(`/projects/${proj.id}`);
+        }
+      };
+
+      const onPointerCancel = (e: PointerEvent) => {
+        pointers.delete(e.pointerId);
+        if (pointers.size < 2) pinchStartDist = 0;
+        if (pointers.size === 0) { isDragging = false; dragDistance = 0; }
       };
 
       // Double-click → fly to that project's city
@@ -981,13 +1042,16 @@ export function Globe3D({ isDark }: Globe3DProps) {
         camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
       };
 
-      renderer.domElement.addEventListener('mousedown', onMouseDown);
+      renderer.domElement.addEventListener('pointerdown', onPointerDown);
+      renderer.domElement.addEventListener('pointermove', onPointerMove);
+      renderer.domElement.addEventListener('pointerup', onPointerUp);
+      renderer.domElement.addEventListener('pointercancel', onPointerCancel);
       renderer.domElement.addEventListener('dblclick', onDblClick);
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
       renderer.domElement.addEventListener('mouseenter', onMouseEnter);
       renderer.domElement.addEventListener('mouseleave', onMouseLeave);
       renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+      // Disable native page panning / pinch-zoom on the canvas so our gestures work.
+      renderer.domElement.style.touchAction = 'none';
       window.addEventListener('resize', onResize);
 
       const animate = () => {
@@ -1017,10 +1081,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
 
       disposeAll = () => {
         cancelAnimationFrame(animId);
-        renderer.domElement.removeEventListener('mousedown', onMouseDown);
+        renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+        renderer.domElement.removeEventListener('pointermove', onPointerMove);
+        renderer.domElement.removeEventListener('pointerup', onPointerUp);
+        renderer.domElement.removeEventListener('pointercancel', onPointerCancel);
         renderer.domElement.removeEventListener('dblclick', onDblClick);
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
         renderer.domElement.removeEventListener('mouseenter', onMouseEnter);
         renderer.domElement.removeEventListener('mouseleave', onMouseLeave);
         renderer.domElement.removeEventListener('wheel', onWheel);
@@ -1115,8 +1180,21 @@ export function Globe3D({ isDark }: Globe3DProps) {
     zoomDisplay <= HIGH_Z ? 'high' : zoomDisplay <= MID_Z ? 'mid' : 'low';
 
   const getCardPos = (x: number, y: number) => {
-    const CW = 280, CH = 355, PAD = 20;
+    const CW = 280, CH = 355, PAD = 20, GAP = 36;
     const vw = window.innerWidth, vh = window.innerHeight;
+
+    // Touch devices: card sits centred above the pin (which has just been
+    // flown to the centre of the canvas).
+    if (isTouchDevice) {
+      let left = x - CW / 2;
+      let top = y - CH - GAP;
+      if (left < PAD) left = PAD;
+      if (left + CW > vw - PAD) left = vw - CW - PAD;
+      if (top < PAD) top = PAD; // fall back to top of viewport on short screens
+      return { left, top };
+    }
+
+    // Desktop hover: card sits to the side of the cursor.
     let left = x + 20, top = y - CH / 2;
     if (left + CW > vw - PAD) left = x - CW - 20;
     if (top < PAD) top = PAD;
