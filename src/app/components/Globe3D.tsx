@@ -651,7 +651,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
   const [zoomDisplay, setZoomDisplay] = useState(ZOOM_DEFAULT);
 
   // Exposed so JSX can trigger fly-to without re-entering the useEffect closure
-  const flyToRef = useRef<((lat: number, lng: number, zoom?: number) => void) | null>(null);
+  const flyToRef = useRef<((lat: number, lng: number, zoom?: number, screenAnchorY?: number) => void) | null>(null);
   // True on devices without hover (phones/tablets). Used to swap the hover card
   // into a tap-to-preview / tap-to-open card.
   const [isTouchDevice] = useState<boolean>(
@@ -676,6 +676,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
   // ── Helper: bake canvas → Three.js texture and assign to earthMat ──────────
   const applyTexture = (canvas: HTMLCanvasElement, refs: NonNullable<typeof themeRefs.current>) => {
     const { THREE, earthMat, renderer } = refs;
+    // Free GPU memory from the previous LOD tier before allocating the new one.
+    // Without this, rapid pinch-zooming (which triggers tier swaps) leaks
+    // textures and can starve the GPU on mobile (visible as a striped /
+    // missing-texture globe).
+    if (earthMat.map) earthMat.map.dispose?.();
     const texture = new THREE.CanvasTexture(canvas);
     texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
     texture.minFilter = THREE.LinearMipmapLinearFilter;
@@ -748,7 +753,11 @@ export function Globe3D({ isDark }: Globe3DProps) {
         color: initialDark ? 0x0b1b30 : 0xc8d8e8, specular: 0x000000, shininess: 0,
       });
       earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 72, 72), earthMat));
-      maxTexSizeRef.current = renderer.capabilities.maxTextureSize ?? 8192;
+      // Even when the GPU reports 16384, iOS Safari can't actually keep a
+      // 16K×8K canvas + mipmaps in memory and falls back to a corrupted
+      // (striped) texture. Cap at 8K — visually indistinguishable on the
+      // sphere at the LOD distances we use.
+      maxTexSizeRef.current = Math.min(renderer.capabilities.maxTextureSize ?? 8192, 8192);
       buildStylizedTexture(initialDark, 'low', maxTexSizeRef.current).then((canvas) => {
         if (!mounted) return;
         applyTexture(canvas, { THREE, earthMat, renderer });
@@ -820,14 +829,22 @@ export function Globe3D({ isDark }: Globe3DProps) {
         if (mounted) setZoomDisplay(z);
       };
 
-      // Expose flyTo to React JSX
-      flyToRef.current = (lat: number, lng: number, zoom = CITY_ZOOM) => {
+      // Expose flyTo to React JSX. screenAnchorY is in NDC (-1 bottom, 0 centre,
+      // +1 top); pass e.g. -0.5 to land the pin 1/4 of the screen up from the
+      // bottom so a preview card has room above it.
+      flyToRef.current = (lat: number, lng: number, zoom = CITY_ZOOM, screenAnchorY = 0) => {
         const [rxTarget, ryTarget] = computeFlyRotation(lat, lng);
         // Shortest arc for Y rotation
         let ryDelta = ryTarget - earthGroup.rotation.y;
         while (ryDelta > Math.PI) ryDelta -= 2 * Math.PI;
         while (ryDelta < -Math.PI) ryDelta += 2 * Math.PI;
-        flyTarget.current = { rx: rxTarget, ry: earthGroup.rotation.y + ryDelta };
+        // Convert the desired NDC y into an extra X-rotation so the target
+        // lat appears off-centre on screen at the fly-target zoom.
+        // Derivation: y_ndc ≈ R·sin(δ) / (zoom − R·cos(δ)) / tan(fov/2)
+        //   → for small δ, δ ≈ y_ndc · (zoom − R) · tan(fov/2) / R
+        const fovRad = (camera.fov * Math.PI) / 180;
+        const rxOffset = screenAnchorY * (zoom - GLOBE_RADIUS) * Math.tan(fovRad / 2) / GLOBE_RADIUS;
+        flyTarget.current = { rx: rxTarget + rxOffset, ry: earthGroup.rotation.y + ryDelta };
         isFlyingRef2.current = true;
         applyZoom(zoom);
       };
@@ -989,16 +1006,16 @@ export function Globe3D({ isDark }: Globe3DProps) {
           updateHoverHighlight(mesh, proj);
           lastTappedProject = proj;
           lastTapAt = Date.now();
-          flyToRef.current?.(cc[0], cc[1]);
-          // Card anchor: where the pin will end up after the fly — the centre
-          // of the canvas. The card positions itself above this point on touch.
+          // Anchor the pin 1/4 of the screen up from the bottom (NDC y = -0.5)
+          // so the preview card has comfortable room above it.
+          flyToRef.current?.(cc[0], cc[1], CITY_ZOOM, -0.5);
           const rect = container.getBoundingClientRect();
           if (mounted) setHoverState({
             project: proj,
             label,
             clusterCenter: cc,
             x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2,
+            y: rect.top + rect.height * 0.75,
           });
         } else {
           navigate(`/projects/${proj.id}`);
