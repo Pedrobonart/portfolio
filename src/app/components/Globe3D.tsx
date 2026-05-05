@@ -33,8 +33,9 @@ interface Globe3DProps {
 // Light: custom JSON served from /public/styles/. BASE_URL prefix handles the
 //   /portfolio/ sub-path on GitHub Pages (dev = '/', prod = '/portfolio/').
 // Dark: hosted OpenFreeMap fallback until a matching dark JSON is ready.
+// Both styles are local JSONs in /public/styles/, served at BASE_URL + styles/.
 const LIGHT_STYLE = `${import.meta.env.BASE_URL}styles/globe-light.json`;
-const DARK_STYLE  = 'https://tiles.openfreemap.org/styles/dark';
+const DARK_STYLE  = `${import.meta.env.BASE_URL}styles/globe-dark.json`;
 
 // ── 2a. Types ─────────────────────────────────────────────────────────────────
 
