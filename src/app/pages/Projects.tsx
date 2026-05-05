@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { projects, ProjectType } from '../data/projects';
 import { MapPin, ArrowRight } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { typeColor, workTypeLabel } from '../utils/project';
 
 type Filter = 'all' | ProjectType;
 
 export function Projects() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>('all');
-  const { isDark } = useTheme();
   const { t } = useLanguage();
 
   const filtered = projects.filter(
@@ -35,10 +34,12 @@ export function Projects() {
     { value: 'cartography', label: t.projects.cartography },
   ];
 
-  const statusLabel = (wt: string) => {
-    if (wt === 'professional') return t.detail.workTypeProfessional;
-    if (wt === 'academic') return t.detail.workTypeAcademic;
-    return t.detail.workTypeThesis;
+  // Work-type badge colour: professional is muted, thesis uses arch accent,
+  // academic uses carto accent.
+  const workTypeBadgeColor = (wt: string) => {
+    if (wt === 'professional') return 'var(--site-muted)';
+    if (wt === 'thesis') return 'var(--site-arch)';
+    return 'var(--site-carto)';
   };
 
   return (
@@ -135,7 +136,7 @@ export function Projects() {
                   key={project.id}
                   style={{
                     opacity: 0,
-                    animation: `pageFadeIn 0.35s ease forwards`,
+                    animation: 'pageFadeIn 0.35s ease forwards',
                     animationDelay: `${yearIdx * 50 + idx * 70}ms`,
                   }}
                 >
@@ -148,12 +149,10 @@ export function Projects() {
                       background: 'var(--site-surface)',
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.borderColor =
-                        'var(--site-text)';
+                      e.currentTarget.style.borderColor = 'var(--site-text)';
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.borderColor =
-                        'var(--site-border)';
+                      e.currentTarget.style.borderColor = 'var(--site-border)';
                     }}
                   >
                     {/* Thumbnail */}
@@ -177,10 +176,7 @@ export function Projects() {
                           style={{
                             fontSize: '0.6rem',
                             fontFamily: 'var(--font-sans)',
-                            color:
-                              project.type === 'architecture'
-                                ? 'var(--site-arch)'
-                                : 'var(--site-carto)',
+                            color: typeColor(project.type),
                             fontWeight: 500,
                           }}
                         >
@@ -237,22 +233,17 @@ export function Projects() {
                         </p>
                       </div>
 
-                      {/* Status + arrow */}
+                      {/* Work type + arrow */}
                       <div className="flex flex-col items-end gap-3 ml-4 shrink-0">
                         <span
                           className="tracking-[0.12em] uppercase"
                           style={{
                             fontSize: '0.6rem',
                             fontFamily: 'var(--font-sans)',
-                            color:
-                              project.workType === 'professional'
-                                ? 'var(--site-muted)'
-                                : project.workType === 'thesis'
-                                ? 'var(--site-arch)'
-                                : 'var(--site-carto)',
+                            color: workTypeBadgeColor(project.workType),
                           }}
                         >
-                          {statusLabel(project.workType)}
+                          {workTypeLabel(project.workType, t)}
                         </span>
                         <ArrowRight
                           size={14}

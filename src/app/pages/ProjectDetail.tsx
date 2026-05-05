@@ -10,14 +10,13 @@ import {
   Square,
   Map,
 } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { typeColor, workTypeLabel } from '../utils/project';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const project = projects.find((p) => p.id === id);
-  const { isDark } = useTheme();
   const { t } = useLanguage();
 
   // Always navigate to /projects — reliable regardless of browser history state
@@ -58,15 +57,7 @@ export function ProjectDetail() {
     .filter((p) => p.id !== project.id && p.type === project.type)
     .slice(0, 2);
 
-  const accentColor =
-    project.type === 'architecture' ? 'var(--site-arch)' : 'var(--site-carto)';
-
-  const workTypeLabel =
-    project.workType === 'professional'
-      ? t.detail.workTypeProfessional
-      : project.workType === 'academic'
-      ? t.detail.workTypeAcademic
-      : t.detail.workTypeThesis;
+  const accentColor = typeColor(project.type);
 
   return (
     <div
@@ -86,12 +77,12 @@ export function ProjectDetail() {
             cursor: 'pointer',
             color: 'var(--site-muted)',
           }}
-          onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.color = 'var(--site-text)')
-          }
-          onMouseLeave={(e) =>
-            ((e.currentTarget as HTMLElement).style.color = 'var(--site-muted)')
-          }
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--site-text)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--site-muted)';
+          }}
         >
           <ArrowLeft
             size={14}
@@ -167,7 +158,7 @@ export function ProjectDetail() {
               <MetaItem
                 icon={<Activity size={12} strokeWidth={1.5} />}
                 label={t.detail.workType}
-                value={workTypeLabel}
+                value={workTypeLabel(project.workType, t)}
               />
               {project.area && (
                 <MetaItem
@@ -235,25 +226,8 @@ export function ProjectDetail() {
                 {t.detail.coordinates}
               </p>
 
-              {/* Single location */}
-              {!project.extraLocations?.length && (
-                <p
-                  style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '0.75rem',
-                    fontVariantNumeric: 'tabular-nums',
-                    color: 'var(--site-text)',
-                  }}
-                >
-                  {project.coordinates[0].toFixed(4)}° N
-                  <br />
-                  {Math.abs(project.coordinates[1]).toFixed(4)}°{' '}
-                  {project.coordinates[1] >= 0 ? 'E' : 'W'}
-                </p>
-              )}
-
-              {/* Multiple locations */}
-              {!!project.extraLocations?.length && (
+              {project.extraLocations?.length ? (
+                // Multiple locations
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: undefined, coordinates: project.coordinates },
@@ -272,22 +246,13 @@ export function ProjectDetail() {
                           {loc.label}
                         </p>
                       )}
-                      <p
-                        style={{
-                          fontFamily: 'var(--font-sans)',
-                          fontSize: '0.75rem',
-                          fontVariantNumeric: 'tabular-nums',
-                          color: 'var(--site-text)',
-                        }}
-                      >
-                        {loc.coordinates[0].toFixed(4)}° N
-                        <br />
-                        {Math.abs(loc.coordinates[1]).toFixed(4)}°{' '}
-                        {loc.coordinates[1] >= 0 ? 'E' : 'W'}
-                      </p>
+                      <CoordinateDisplay coordinates={loc.coordinates} />
                     </div>
                   ))}
                 </div>
+              ) : (
+                // Single location
+                <CoordinateDisplay coordinates={project.coordinates} />
               )}
             </div>
           </aside>
@@ -370,12 +335,10 @@ export function ProjectDetail() {
                   background: 'var(--site-surface)',
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor =
-                    'var(--site-text)';
+                  e.currentTarget.style.borderColor = 'var(--site-text)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor =
-                    'var(--site-border)';
+                  e.currentTarget.style.borderColor = 'var(--site-border)';
                 }}
               >
                 <div
@@ -430,6 +393,26 @@ export function ProjectDetail() {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function CoordinateDisplay({ coordinates }: { coordinates: [number, number] }) {
+  const [lat, lng] = coordinates;
+  return (
+    <p
+      style={{
+        fontFamily: 'var(--font-sans)',
+        fontSize: '0.75rem',
+        fontVariantNumeric: 'tabular-nums',
+        color: 'var(--site-text)',
+      }}
+    >
+      {lat.toFixed(4)}° N
+      <br />
+      {Math.abs(lng).toFixed(4)}° {lng >= 0 ? 'E' : 'W'}
+    </p>
   );
 }
 
