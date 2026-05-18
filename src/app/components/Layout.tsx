@@ -10,23 +10,8 @@ export function Layout() {
   const { isDark, toggleTheme } = useTheme();
   const { language, t, toggleLanguage } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  // Close mobile menu whenever the route changes.
+  // Close the mobile menu on route change
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
-
-  // Shared hover colours for the two small icon/text buttons in the nav.
-  // On the landing page the nav sits over a dark globe; elsewhere it sits on
-  // the themed background, so hover targets differ.
-  const navBtnHover = {
-    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-      e.currentTarget.style.color = isLanding ? 'white' : 'var(--site-text)';
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-      e.currentTarget.style.color = isLanding
-        ? 'rgba(255,255,255,0.75)'
-        : 'var(--site-muted)';
-    },
-  };
 
   return (
     <div
@@ -44,7 +29,7 @@ export function Layout() {
                   ? 'rgba(12,12,10,0.95)'
                   : 'rgba(250,250,248,0.95)',
                 backdropFilter: 'blur(8px)',
-                borderBottom: '1px solid var(--site-border)',
+                borderBottom: `1px solid var(--site-border)`,
               }
         }
       >
@@ -52,7 +37,7 @@ export function Layout() {
           {/* Logo / Name */}
           <NavLink
             to="/"
-            className="tracking-[0.15em] uppercase"
+            className="tracking-[0.15em] uppercase leading-tight"
             style={{
               fontFamily: 'var(--font-sans)',
               fontWeight: 500,
@@ -60,29 +45,20 @@ export function Layout() {
               color: isLanding ? 'rgba(255,255,255,0.92)' : 'var(--site-text)',
             }}
           >
-            {t.nav.name}
+            {(() => {
+              const parts = t.nav.name.split(' ');
+              const first = parts[0];
+              const rest = parts.slice(1).join(' ');
+              return (
+                <>
+                  <span className="block md:inline">{first}{rest ? ' ' : ''}</span>
+                  {rest && <span className="block md:inline">{rest}</span>}
+                </>
+              );
+            })()}
           </NavLink>
 
-          {/* Mobile hamburger (visible < md) */}
-          <button
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-            className="md:hidden"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: isLanding ? 'rgba(255,255,255,0.92)' : 'var(--site-text)',
-              padding: 4,
-            }}
-          >
-            <Menu size={22} strokeWidth={1.5} />
-          </button>
-
-          {/* Desktop nav links + Controls (hidden < md) */}
+          {/* Nav links + Controls — desktop only */}
           <div className="hidden md:flex items-center gap-6">
             {/* Nav links */}
             {[
@@ -133,7 +109,16 @@ export function Layout() {
                 padding: '2px 6px',
                 transition: 'color 0.2s',
               }}
-              {...navBtnHover}
+              onMouseEnter={(e) => {
+                (e.target as HTMLElement).style.color = isLanding
+                  ? 'white'
+                  : 'var(--site-text)';
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLElement).style.color = isLanding
+                  ? 'rgba(255,255,255,0.75)'
+                  : 'var(--site-muted)';
+              }}
             >
               {language === 'en' ? 'ES' : 'EN'}
             </button>
@@ -153,115 +138,132 @@ export function Layout() {
                 padding: 2,
                 transition: 'color 0.2s',
               }}
-              {...navBtnHover}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = isLanding
+                  ? 'white'
+                  : 'var(--site-text)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = isLanding
+                  ? 'rgba(255,255,255,0.75)'
+                  : 'var(--site-muted)';
+              }}
             >
               {isDark ? <Sun size={15} strokeWidth={1.5} /> : <Moon size={15} strokeWidth={1.5} />}
             </button>
           </div>
+
+          {/* Mobile-only: language toggle + hamburger */}
+          <div className="flex md:hidden items-center gap-3">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              style={{
+                background: menuOpen
+                  ? ('var(--menu-bg-strong)')
+                  : 'transparent',
+                backdropFilter: menuOpen ? 'blur(8px)' : undefined,
+                border: 'none', cursor: 'pointer',
+                color: isLanding && !menuOpen ? 'rgba(255,255,255,0.9)' : 'var(--site-text)',
+                padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.2s ease, color 0.2s ease',
+              }}
+            >
+              <span style={{ position: 'relative', width: 20, height: 20, display: 'inline-block' }}>
+                <Menu
+                  size={20}
+                  strokeWidth={1.5}
+                  style={{
+                    position: 'absolute', inset: 0,
+                    opacity: menuOpen ? 0 : 1,
+                    transform: menuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                    transition: 'opacity 0.2s ease, transform 0.25s ease',
+                  }}
+                />
+                <X
+                  size={20}
+                  strokeWidth={1.5}
+                  style={{
+                    position: 'absolute', inset: 0,
+                    opacity: menuOpen ? 1 : 0,
+                    transform: menuOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                    transition: 'opacity 0.2s ease, transform 0.25s ease',
+                  }}
+                />
+              </span>
+            </button>
+          </div>
         </nav>
 
-        {/* Mobile menu overlay */}
+        {/* Mobile menu panel */}
         {menuOpen && (
           <div
-            className="md:hidden fixed inset-0 z-[10000] flex flex-col"
+            className="md:hidden flex flex-col w-fit ml-auto mr-8 -mt-5 menu-drop"
             style={{
-              background: isDark ? 'rgba(8,10,18,0.98)' : 'rgba(250,250,248,0.98)',
-              backdropFilter: 'blur(10px)',
+              background: 'var(--menu-bg)',
+              backdropFilter: 'blur(8px)',
+              borderLeft: '1px solid var(--site-border)',
+              borderTop: '1px solid var(--site-border)',
+              borderBottom: '1px solid var(--site-border)',
+              transformOrigin: 'top right',
             }}
           >
-            <div className="flex items-center justify-between px-8 py-5">
-              <span
-                className="tracking-[0.15em] uppercase"
+            {[
+              { to: '/', label: t.nav.globe },
+              { to: '/projects', label: t.nav.projects },
+              { to: '/about', label: t.nav.about },
+            ].map(({ to, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end
+                className={({ isActive }) =>
+                  `tracking-[0.1em] uppercase transition-opacity duration-200 ${
+                    isActive ? 'opacity-100' : 'opacity-60'
+                  }`
+                }
                 style={{
                   fontFamily: 'var(--font-sans)',
-                  fontWeight: 500,
-                  fontSize: '0.82rem',
+                  fontSize: '0.85rem',
                   color: 'var(--site-text)',
+                  padding: '14px 16px 14px 32px',
+                  borderBottom: '1px solid var(--site-border)',
+                  textAlign: 'right',
                 }}
               >
-                {t.nav.name}
-              </span>
-              <button
-                onClick={() => setMenuOpen(false)}
-                aria-label="Close menu"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--site-text)',
-                  padding: 4,
-                }}
-              >
-                <X size={22} strokeWidth={1.5} />
-              </button>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
-              {[
-                { to: '/', label: t.nav.globe },
-                { to: '/projects', label: t.nav.projects },
-                { to: '/about', label: t.nav.about },
-              ].map(({ to, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end
-                  className={({ isActive }) =>
-                    `tracking-[0.15em] uppercase transition-opacity duration-200 ${
-                      isActive ? 'opacity-100' : 'opacity-55 hover:opacity-90'
-                    }`
-                  }
-                  style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '1.05rem',
-                    color: 'var(--site-text)',
-                  }}
-                >
-                  {label}
-                </NavLink>
-              ))}
-
-              <div
-                style={{
-                  width: 40,
-                  height: 1,
-                  background: 'var(--site-border)',
-                  marginTop: 8,
-                }}
-              />
-
-              <div className="flex items-center gap-8">
+                {label}
+              </NavLink>
+            ))}
+            <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--menu-bg-strong)' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 0' }}>
                 <button
                   onClick={toggleLanguage}
-                  title={language === 'en' ? 'Cambiar a Español' : 'Switch to English'}
+                  aria-label={language === 'en' ? 'Cambiar a Español' : 'Switch to English'}
                   style={{
                     fontFamily: 'var(--font-sans)',
-                    fontSize: '0.75rem',
-                    letterSpacing: '0.15em',
-                    color: 'var(--site-muted)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px 8px',
+                    fontSize: '0.85rem',
+                    letterSpacing: '0.1em',
+                    // Letter-spacing adds trailing space after the last glyph,
+                    // pushing the text optically to the right. Compensate so
+                    // the visual mass sits centered.
+                    paddingLeft: '0.1em',
+                    color: 'var(--site-text)',
+                    background: 'none', border: 'none', cursor: 'pointer',
                   }}
                 >
                   {language === 'en' ? 'ES' : 'EN'}
                 </button>
+              </div>
+              <div style={{ alignSelf: 'center', width: 1, height: 18, background: 'var(--site-border)' }} />
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 0' }}>
                 <button
                   onClick={toggleTheme}
-                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--site-muted)',
-                    padding: 4,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--site-text)',
+                    padding: 0,
                   }}
                 >
                   {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
@@ -272,10 +274,27 @@ export function Layout() {
         )}
       </header>
 
-      {/* Page content — pageFadeIn keyframe is defined in index.css */}
+      {/* Page content */}
       <main key={location.pathname} className="page-fade-in">
         <Outlet />
       </main>
+
+      <style>{`
+        @keyframes pageFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .page-fade-in {
+          animation: pageFadeIn 0.3s ease forwards;
+        }
+        @keyframes menuDrop {
+          from { transform: scaleY(0.05) scaleX(0.85); opacity: 0; }
+          to   { transform: scaleY(1) scaleX(1); opacity: 1; }
+        }
+        .menu-drop {
+          animation: menuDrop 0.22s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+        }
+      `}</style>
     </div>
   );
 }
