@@ -135,75 +135,8 @@ import { csvProjects } from './projects.generated';
 // from templates/Projects/PROJECTS.csv are merged in at the end of the list
 // via `csvProjects` (see scripts/build-projects.mjs).
 const handProjects: Project[] = [
-  {
-    id: 'waterfront-cultural-center',
-    title: 'Waterfront Cultural Center',
-    type: 'architecture',
-    year: 2024,
-    location: 'Rotterdam',
-    country: 'Netherlands',
-    coordinates: [51.9244, 4.4777],
-    shortDescription:
-      'A contemporary cultural complex bridging the Nieuwe Maas river and the city\'s historic port heritage.',
-    description:
-      'The Waterfront Cultural Center emerges from the tension between Rotterdam\'s industrial past and its ambition to become a global cultural destination. Situated at the former Rijnhaven dock, the project weaves together three programmatic strands — exhibition, performance, and public gathering — under a continuous folded roof that references the geometry of container stacking.',
-    details:
-      'The structural system relies on a series of tapered concrete fins that transfer lateral loads to a buried podium, freeing the ground level for uninterrupted public flow between the river promenade and the city interior. Façade elements are clad in cor-ten steel panels that develop a patina mirroring the harbour\'s aging cranes. The interior circulation is organized along a single spiraling ramp that doubles as gallery space, offering changing viewpoints of the Maas at each level. Daylighting is controlled through a system of motorized louvres calibrated to the north-facing river exposure.',
-    client: 'Municipality of Rotterdam / Kunsthal Foundation',
-    workType: 'professional',
-    area: '18,400 m²',
-    image:
-      'https://images.unsplash.com/photo-1773134284411-c3a809aa0965?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3YXRlcmZyb250JTIwY3VsdHVyYWwlMjBjZW50ZXIlMjBhcmNoaXRlY3R1cmV8ZW58MXx8fHwxNzc2OTQ5MzczfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    // Example showing media at all four slots. Replace with real project imagery.
-    media: [
-      // Big carousel right below the hero.
-      {
-        kind: 'carousel',
-        slot: 'afterHero',
-        aspect: '16/9',
-        images: [
-          { src: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=80', caption: 'River-side approach' },
-          { src: 'https://images.unsplash.com/photo-1496564203457-11bb12075d90?w=1400&q=80', caption: 'Main hall, north light' },
-          { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=1400&q=80', caption: 'Spiral gallery ramp' },
-        ],
-      },
-      // Pair sits between description and details.
-      {
-        kind: 'pair',
-        slot: 'afterDescription',
-        aspect: '4/3',
-        images: [
-          { src: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=900&q=80', caption: 'Cor-ten façade detail' },
-          { src: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=900&q=80', caption: 'Public plaza' },
-        ],
-      },
-      // Wide drawing under the details paragraph.
-      {
-        kind: 'image',
-        slot: 'afterDetails',
-        size: 'full',
-        aspect: '16/9',
-        src: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1600&q=80',
-        caption: 'Long section through the spiraling exhibition ramp.',
-      },
-      // Full-width photo grid right above the related-projects section.
-      {
-        kind: 'grid',
-        slot: 'beforeRelated',
-        columns: 3,
-        aspect: '1/1',
-        images: [
-          { src: 'https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?w=600&q=80' },
-          { src: 'https://images.unsplash.com/photo-1448630360428-65456885c650?w=600&q=80' },
-          { src: 'https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?w=600&q=80' },
-          { src: 'https://images.unsplash.com/photo-1494891848038-7bd202a2afeb?w=600&q=80' },
-          { src: 'https://images.unsplash.com/photo-1464082354059-27db6ce50048?w=600&q=80' },
-          { src: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=600&q=80' },
-        ],
-      },
-    ],
-    tags: ['Cultural', 'Public', 'Mixed-Use', 'Waterfront'],
-  },
+  // NOTE: waterfront-cultural-center has been migrated to PROJECTS.csv +
+  // templates/Projects/media/waterfront-cultural-center.media.json.
   {
     id: 'alpine-terrain-analysis',
     title: 'Alpine Terrain Analysis',
