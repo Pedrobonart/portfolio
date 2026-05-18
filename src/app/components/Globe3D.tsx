@@ -166,8 +166,8 @@ const AUTO_ROTATE_BELOW_ZOOM = 3.5; // auto-rotation only active below this zoom
 // ── 2e. Pin colour palette ────────────────────────────────────────────────────
 // Two project types, two themes — colours are injected into the GL paint
 // expressions inside setupLayers() after each style load.
-const ARCH_LIGHT  = '#c07830', ARCH_DARK  = '#e8a848'; // architecture pins
-const CARTO_LIGHT = '#2a6e9a', CARTO_DARK = '#4aaad8'; // cartography pins
+const ARCH_LIGHT  = '#c07830', ARCH_DARK  = '#8a5424'; // architecture pins
+const CARTO_LIGHT = '#2a6e9a', CARTO_DARK = '#1f4f70'; // cartography pins
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 3. Component
