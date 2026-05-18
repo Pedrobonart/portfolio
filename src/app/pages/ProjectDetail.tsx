@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { typeColor, workTypeLabel } from '../utils/project';
+import { LayoutBlocks, MediaBlocks } from '../components/MediaBlocks';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -112,6 +113,16 @@ export function ProjectDetail() {
           />
         </div>
       </div>
+
+      {/* Media blocks placed in the 'afterHero' slot (the default). */}
+      {project.media && (
+        <div
+          className="mt-10 px-8 md:px-16 max-w-6xl mx-auto"
+          style={{ opacity: 0, animation: 'pageFadeIn 0.5s ease 0.1s forwards' }}
+        >
+          <MediaBlocks blocks={project.media} slot="afterHero" />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="px-8 md:px-16 mt-12 max-w-6xl mx-auto">
@@ -281,32 +292,59 @@ export function ProjectDetail() {
               style={{ background: 'var(--site-text)' }}
             />
 
-            {/* Description */}
-            <div className="space-y-6">
-              <p
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '0.95rem',
-                  lineHeight: 1.8,
-                  color: 'var(--site-text2)',
-                }}
-              >
-                {project.description}
-              </p>
-              <p
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '0.88rem',
-                  lineHeight: 1.85,
-                  color: 'var(--site-muted)',
-                }}
-              >
-                {project.details}
-              </p>
-            </div>
+            {/* Body: either custom layout, or default description/details
+                with slotted media in between. */}
+            {project.layout && project.layout.length > 0 ? (
+              <LayoutBlocks
+                blocks={project.layout}
+                description={project.description}
+                details={project.details}
+              />
+            ) : (
+              <div className="space-y-6">
+                <p
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.95rem',
+                    lineHeight: 1.8,
+                    color: 'var(--site-text2)',
+                  }}
+                >
+                  {project.description}
+                </p>
+
+                {/* Slot: afterDescription */}
+                {project.media && (
+                  <MediaBlocks blocks={project.media} slot="afterDescription" />
+                )}
+
+                <p
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.85,
+                    color: 'var(--site-muted)',
+                  }}
+                >
+                  {project.details}
+                </p>
+
+                {/* Slot: afterDetails */}
+                {project.media && (
+                  <MediaBlocks blocks={project.media} slot="afterDetails" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Slot: beforeRelated — full-width row before related-projects section. */}
+      {project.media && (
+        <div className="mt-16 px-8 md:px-16 max-w-6xl mx-auto">
+          <MediaBlocks blocks={project.media} slot="beforeRelated" />
+        </div>
+      )}
 
       {/* Related Projects */}
       {otherProjects.length > 0 && (

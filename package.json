@@ -4,6 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "build:projects": "node scripts/build-projects.mjs",
+    "predev": "node scripts/build-projects.mjs",
+    "prebuild": "node scripts/build-projects.mjs",
+    "dev": "vite",
     "build": "vite build"
   },
   "dependencies": {

@@ -1,0 +1,36 @@
+{
+  "_comment": "Per-project media sidecar. Set `media_file` in PROJECTS.csv to this filename (e.g. waterfront-cultural-center.media.json). Either `media` (named slots), `layout` (custom body), or both.",
+
+  "media": [
+    {
+      "kind": "carousel",
+      "slot": "afterHero",
+      "aspect": "16/9",
+      "images": [
+        { "src": "/photos/p1.jpg", "caption": "Approach" },
+        { "src": "/photos/p2.jpg", "caption": "Main hall" }
+      ]
+    },
+    {
+      "kind": "pair",
+      "slot": "afterDescription",
+      "images": [
+        { "src": "/photos/d1.jpg" },
+        { "src": "/photos/d2.jpg" }
+      ]
+    },
+    {
+      "kind": "grid",
+      "slot": "beforeRelated",
+      "columns": 3,
+      "aspect": "1/1",
+      "images": [
+        { "src": "/photos/g1.jpg" },
+        { "src": "/photos/g2.jpg" },
+        { "src": "/photos/g3.jpg" }
+      ]
+    }
+  ],
+
+  "layout": null
+}

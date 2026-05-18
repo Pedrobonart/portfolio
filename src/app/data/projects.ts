@@ -8,6 +8,88 @@ export interface ProjectLocation {
   coordinates: [number, number];
 }
 
+// ─── Project media blocks ────────────────────────────────────────────────
+// A project page can mix multiple layouts. Each block is one row of media.
+// By default it appears in the `afterHero` slot, but the `slot` field lets
+// you place it elsewhere on the page. See <ProjectDetail /> for the slots
+// and <MediaBlocks /> for the renderers.
+export type MediaSlot =
+  | 'afterHero'          // between hero image and the title/text grid
+  | 'afterDescription'   // between the description and the details paragraph
+  | 'afterDetails'       // below the details paragraph (still inside right column)
+  | 'beforeRelated';     // full-width row above the "related projects" section
+
+export interface MediaImage {
+  src: string;
+  alt?: string;
+  caption?: string;
+}
+
+interface MediaBlockBase {
+  /** Where on the page this block renders. Defaults to 'afterHero'. */
+  slot?: MediaSlot;
+}
+
+/** Single image. `size` controls horizontal extent inside the content area. */
+export interface MediaImageBlock extends MediaImage, MediaBlockBase {
+  kind: 'image';
+  /** full = 100% of content area, wide = ~80%, half = ~50%. Defaults to full. */
+  size?: 'full' | 'wide' | 'half';
+  /** aspect ratio hint, defaults to 16/9. Use 'auto' to keep natural ratio. */
+  aspect?: '16/9' | '4/3' | '1/1' | '3/4' | 'auto';
+}
+
+/** Two images side-by-side (stacks on mobile). */
+export interface MediaPairBlock extends MediaBlockBase {
+  kind: 'pair';
+  images: [MediaImage, MediaImage];
+  aspect?: '16/9' | '4/3' | '1/1' | '3/4' | 'auto';
+}
+
+/** N-column grid (mobile collapses to single column). */
+export interface MediaGridBlock extends MediaBlockBase {
+  kind: 'grid';
+  images: MediaImage[];
+  columns?: 2 | 3 | 4;
+  aspect?: '16/9' | '4/3' | '1/1' | '3/4' | 'auto';
+}
+
+/** Horizontal carousel (swipe / arrows). */
+export interface MediaCarouselBlock extends MediaBlockBase {
+  kind: 'carousel';
+  images: MediaImage[];
+  aspect?: '16/9' | '4/3' | '1/1' | '3/4' | 'auto';
+}
+
+export type MediaBlock =
+  | MediaImageBlock
+  | MediaPairBlock
+  | MediaGridBlock
+  | MediaCarouselBlock;
+
+// ─── Custom page layout (advanced) ───────────────────────────────────────
+// Setting `project.layout` REPLACES the default body (title, description,
+// details). Each entry renders in order in the right column. Use this for
+// projects that need a bespoke flow — text, media, headings, etc.
+export interface LayoutHeading { kind: 'heading'; text: string; }
+export interface LayoutParagraph {
+  kind: 'paragraph';
+  text: string;
+  /** Visual emphasis — 'lead' = larger first-paragraph style, 'body' = default. */
+  emphasis?: 'lead' | 'body' | 'muted';
+}
+/** Pulls the project's existing `description` or `details` string in-place. */
+export interface LayoutBuiltin { kind: 'description' | 'details'; }
+/** Spacer for breathing room between blocks (rem). */
+export interface LayoutSpacer { kind: 'spacer'; size?: 'sm' | 'md' | 'lg'; }
+
+export type LayoutBlock =
+  | LayoutHeading
+  | LayoutParagraph
+  | LayoutBuiltin
+  | LayoutSpacer
+  | MediaBlock;
+
 export interface Project {
   id: string;
   title: string;
@@ -29,11 +111,30 @@ export interface Project {
   workType: WorkType;
   area?: string;
   scale?: string;
+  /** Hero / thumbnail image — also used in listings, related-project cards. */
   image: string;
+  /**
+   * Optional media blocks placed at named slots on the detail page.
+   * If `slot` is omitted on a block, it defaults to 'afterHero'.
+   * Ignored when `layout` is set (then put media inside `layout`).
+   */
+  media?: MediaBlock[];
+  /**
+   * Advanced: fully custom body sequence for this project. When set, this
+   * REPLACES the default title+description+details rendering in the right
+   * column. Media in `media` is still honored for slots OUTSIDE the body
+   * (afterHero, beforeRelated).
+   */
+  layout?: LayoutBlock[];
   tags: string[];
 }
 
-export const projects: Project[] = [
+import { csvProjects } from './projects.generated';
+
+// Hand-coded projects authored directly in this file. CSV-driven projects
+// from templates/Projects/PROJECTS.csv are merged in at the end of the list
+// via `csvProjects` (see scripts/build-projects.mjs).
+const handProjects: Project[] = [
   {
     id: 'waterfront-cultural-center',
     title: 'Waterfront Cultural Center',
@@ -53,6 +154,54 @@ export const projects: Project[] = [
     area: '18,400 m²',
     image:
       'https://images.unsplash.com/photo-1773134284411-c3a809aa0965?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3YXRlcmZyb250JTIwY3VsdHVyYWwlMjBjZW50ZXIlMjBhcmNoaXRlY3R1cmV8ZW58MXx8fHwxNzc2OTQ5MzczfDA&ixlib=rb-4.1.0&q=80&w=1080',
+    // Example showing media at all four slots. Replace with real project imagery.
+    media: [
+      // Big carousel right below the hero.
+      {
+        kind: 'carousel',
+        slot: 'afterHero',
+        aspect: '16/9',
+        images: [
+          { src: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=80', caption: 'River-side approach' },
+          { src: 'https://images.unsplash.com/photo-1496564203457-11bb12075d90?w=1400&q=80', caption: 'Main hall, north light' },
+          { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=1400&q=80', caption: 'Spiral gallery ramp' },
+        ],
+      },
+      // Pair sits between description and details.
+      {
+        kind: 'pair',
+        slot: 'afterDescription',
+        aspect: '4/3',
+        images: [
+          { src: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=900&q=80', caption: 'Cor-ten façade detail' },
+          { src: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=900&q=80', caption: 'Public plaza' },
+        ],
+      },
+      // Wide drawing under the details paragraph.
+      {
+        kind: 'image',
+        slot: 'afterDetails',
+        size: 'full',
+        aspect: '16/9',
+        src: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1600&q=80',
+        caption: 'Long section through the spiraling exhibition ramp.',
+      },
+      // Full-width photo grid right above the related-projects section.
+      {
+        kind: 'grid',
+        slot: 'beforeRelated',
+        columns: 3,
+        aspect: '1/1',
+        images: [
+          { src: 'https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?w=600&q=80' },
+          { src: 'https://images.unsplash.com/photo-1448630360428-65456885c650?w=600&q=80' },
+          { src: 'https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?w=600&q=80' },
+          { src: 'https://images.unsplash.com/photo-1494891848038-7bd202a2afeb?w=600&q=80' },
+          { src: 'https://images.unsplash.com/photo-1464082354059-27db6ce50048?w=600&q=80' },
+          { src: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=600&q=80' },
+        ],
+      },
+    ],
     tags: ['Cultural', 'Public', 'Mixed-Use', 'Waterfront'],
   },
   {
@@ -207,3 +356,6 @@ export const projects: Project[] = [
     tags: ['Arctic', 'Bathymetry', 'Sea Ice', 'Expedition'],
   },
 ];
+
+// Final exported list: hand-coded projects first, then CSV-driven ones.
+export const projects: Project[] = [...handProjects, ...csvProjects];
