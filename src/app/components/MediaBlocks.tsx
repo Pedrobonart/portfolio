@@ -2,8 +2,9 @@
 // Each block in `project.media[]` is one row; see ../data/projects.ts for the
 // schema (kinds: image | pair | grid | carousel).
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import useEmblaCarousel from 'embla-carousel-react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type {
   LayoutBlock,
   MediaBlock,
@@ -46,20 +47,38 @@ const columnsClass = (c?: 2 | 3 | 4): string => {
 };
 
 // Shared <img> wrapper with the surface background + caption.
-function Frame({ img, aspect }: { img: MediaImage; aspect?: string }) {
+// `onClick` (optional) makes the image act as a lightbox trigger.
+function Frame({
+  img,
+  aspect,
+  onClick,
+}: {
+  img: MediaImage;
+  aspect?: string;
+  onClick?: () => void;
+}) {
   return (
     <figure>
-      <div
-        className={`w-full overflow-hidden ${aspect ?? ''}`}
-        style={{ background: 'var(--site-surface2)' }}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={onClick ? `Open ${img.alt || 'image'} full size` : undefined}
+        disabled={!onClick}
+        className={`group w-full overflow-hidden block ${aspect ?? ''}`}
+        style={{
+          background: 'var(--site-surface2)',
+          border: 'none',
+          padding: 0,
+          cursor: onClick ? 'zoom-in' : 'default',
+        }}
       >
         <img
           src={img.src}
           alt={img.alt ?? ''}
           loading="lazy"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
         />
-      </div>
+      </button>
       {img.caption && (
         <figcaption
           className="mt-2 tracking-[0.05em]"
@@ -76,36 +95,232 @@ function Frame({ img, aspect }: { img: MediaImage; aspect?: string }) {
   );
 }
 
+// ─── Lightbox ────────────────────────────────────────────────────────────
+// Full-viewport modal with prev/next navigation. Used by every block kind.
+// Closes on Esc, backdrop click, or the close button. Body scroll is locked
+// while open. Rendered through a portal so block-level overflow/transform
+// stacking never traps it.
+function Lightbox({
+  images,
+  startIndex,
+  onClose,
+}: {
+  images: MediaImage[];
+  startIndex: number;
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(startIndex);
+  const total = images.length;
+
+  const prev = useCallback(() => setIndex((i) => (i - 1 + total) % total), [total]);
+  const next = useCallback(() => setIndex((i) => (i + 1) % total), [total]);
+
+  // Keyboard: Esc closes, arrows navigate.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft' && total > 1) prev();
+      else if (e.key === 'ArrowRight' && total > 1) next();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, prev, next, total]);
+
+  // Lock body scroll while open.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
+  const img = images[index];
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image viewer"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 10000,
+        background: 'rgba(0,0,0,0.92)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '5vh 5vw',
+        animation: 'lightboxFadeIn 0.2s ease',
+      }}
+    >
+      {/* Close */}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        style={{
+          position: 'absolute', top: 16, right: 16,
+          width: 40, height: 40,
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <X size={20} strokeWidth={1.5} />
+      </button>
+
+      {/* Prev */}
+      {total > 1 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); prev(); }}
+          aria-label="Previous"
+          style={{
+            position: 'absolute', top: '50%', left: 16, transform: 'translateY(-50%)',
+            width: 44, height: 44,
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronLeft size={22} strokeWidth={1.5} />
+        </button>
+      )}
+
+      {/* Image (clicking the image itself doesn't close — only backdrop does). */}
+      <figure
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '100%', maxHeight: '100%',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        }}
+      >
+        <img
+          src={img.src}
+          alt={img.alt ?? ''}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '85vh',
+            objectFit: 'contain',
+            display: 'block',
+          }}
+        />
+        {img.caption && (
+          <figcaption
+            className="tracking-[0.05em] text-center"
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '0.78rem',
+              color: 'rgba(255,255,255,0.85)',
+              maxWidth: '70ch',
+            }}
+          >
+            {img.caption}
+            {total > 1 && (
+              <span style={{ opacity: 0.55, marginLeft: 12 }}>
+                {index + 1} / {total}
+              </span>
+            )}
+          </figcaption>
+        )}
+        {!img.caption && total > 1 && (
+          <figcaption
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '0.78rem',
+              color: 'rgba(255,255,255,0.55)',
+            }}
+          >
+            {index + 1} / {total}
+          </figcaption>
+        )}
+      </figure>
+
+      {/* Next */}
+      {total > 1 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); next(); }}
+          aria-label="Next"
+          style={{
+            position: 'absolute', top: '50%', right: 16, transform: 'translateY(-50%)',
+            width: 44, height: 44,
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronRight size={22} strokeWidth={1.5} />
+        </button>
+      )}
+
+      {/* Keyframe lives in this same file via a one-off style tag. */}
+      <style>{`@keyframes lightboxFadeIn { from { opacity: 0 } to { opacity: 1 } }`}</style>
+    </div>,
+    document.body,
+  );
+}
+
+// Tiny hook every block uses to manage its lightbox state.
+function useLightbox() {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  return {
+    openAt: (i: number) => setOpenIdx(i),
+    close:  ()          => setOpenIdx(null),
+    openIdx,
+  };
+}
+
 // ─── Individual block renderers ──────────────────────────────────────────
+// Every block runs its images through the Lightbox on click. Each block owns
+// its own `useLightbox` state so multiple blocks on the same page don't
+// interfere with each other.
 function ImageRow({ block }: { block: MediaImageBlock }) {
+  const lb = useLightbox();
+  const images: MediaImage[] = [{ src: block.src, alt: block.alt, caption: block.caption }];
   return (
     <div className={sizeClass(block.size)}>
       <Frame
-        img={{ src: block.src, alt: block.alt, caption: block.caption }}
+        img={images[0]}
         aspect={aspectClass(block.aspect)}
+        onClick={() => lb.openAt(0)}
       />
+      {lb.openIdx !== null && (
+        <Lightbox images={images} startIndex={lb.openIdx} onClose={lb.close} />
+      )}
     </div>
   );
 }
 
 function PairRow({ block }: { block: MediaPairBlock }) {
+  const lb = useLightbox();
   const a = aspectClass(block.aspect);
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
       {block.images.map((img, i) => (
-        <Frame key={i} img={img} aspect={a} />
+        <Frame key={i} img={img} aspect={a} onClick={() => lb.openAt(i)} />
       ))}
+      {lb.openIdx !== null && (
+        <Lightbox images={block.images} startIndex={lb.openIdx} onClose={lb.close} />
+      )}
     </div>
   );
 }
 
 function GridRow({ block }: { block: MediaGridBlock }) {
+  const lb = useLightbox();
   const a = aspectClass(block.aspect ?? '4/3');
   return (
     <div className={`grid gap-4 md:gap-6 ${columnsClass(block.columns)}`}>
       {block.images.map((img, i) => (
-        <Frame key={i} img={img} aspect={a} />
+        <Frame key={i} img={img} aspect={a} onClick={() => lb.openAt(i)} />
       ))}
+      {lb.openIdx !== null && (
+        <Lightbox images={block.images} startIndex={lb.openIdx} onClose={lb.close} />
+      )}
     </div>
   );
 }
@@ -115,6 +330,7 @@ function CarouselRow({ block }: { block: MediaCarouselBlock }) {
   const [selected, setSelected] = useState(0);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
+  const lb = useLightbox();
 
   const onSelect = useCallback(() => {
     if (!embla) return;
@@ -138,11 +354,15 @@ function CarouselRow({ block }: { block: MediaCarouselBlock }) {
         <div className="flex">
           {block.images.map((img, i) => (
             <div key={i} className="flex-[0_0_100%] min-w-0">
-              <Frame img={img} aspect={a} />
+              <Frame img={img} aspect={a} onClick={() => lb.openAt(i)} />
             </div>
           ))}
         </div>
       </div>
+
+      {lb.openIdx !== null && (
+        <Lightbox images={block.images} startIndex={lb.openIdx} onClose={lb.close} />
+      )}
 
       {/* Prev / Next */}
       <button
