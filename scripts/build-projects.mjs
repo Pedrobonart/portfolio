@@ -112,6 +112,24 @@ function loadPresets() {
 // ─── Row → Project ───────────────────────────────────────────────────────
 function rowToProject(headers, row, presets) {
   const get = (k) => trimOrNull(row[headers.indexOf(k)]);
+  // Pull a bilingual field: if the `_es` column is non-empty, emit a
+  // `{ en, es }` object; otherwise emit a plain string for english-only.
+  const getLocalized = (k) => {
+    const en = get(k);
+    const es = get(`${k}_es`);
+    if (en == null && es == null) return undefined;
+    if (es == null || es === '') return en ?? '';
+    return { en: en ?? '', es };
+  };
+  // Same for arrays parsed via pipe.
+  const getLocalizedTags = () => {
+    const en = parseTags(get('tags'));
+    const esRaw = get('tags_es');
+    const es = esRaw ? parseTags(esRaw) : null;
+    if (!es || es.length === 0) return en;
+    return { en, es };
+  };
+
   if (!get('id')) return null; // empty row
 
   const lat = Number(get('lat'));
@@ -122,22 +140,22 @@ function rowToProject(headers, row, presets) {
 
   const project = {
     id:               get('id'),
-    title:            get('title'),
+    title:            getLocalized('title'),
     type:             get('type'),
     year:             Number(get('year')),
-    location:         get('location'),
-    country:          get('country'),
+    location:         getLocalized('location'),
+    country:          getLocalized('country'),
     coordinates:      [lat, lng],
     extraLocations:   parseExtra(get('extra_locations')),
-    shortDescription: get('short_description') ?? '',
-    description:      get('description') ?? '',
-    details:          get('details') ?? '',
-    client:           get('client') ?? '',
+    shortDescription: getLocalized('short_description') ?? '',
+    description:      getLocalized('description') ?? '',
+    details:          getLocalized('details') ?? '',
+    client:           getLocalized('client') ?? '',
     workType:         get('work_type'),
-    area:             get('area') ?? undefined,
-    scale:            get('scale') ?? undefined,
+    area:             getLocalized('area'),
+    scale:            getLocalized('scale'),
     image:            get('image') ?? '',
-    tags:             parseTags(get('tags')),
+    tags:             getLocalizedTags(),
   };
 
   // Merge preset + sidecar media/layout.

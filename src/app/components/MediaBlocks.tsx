@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { pickL } from '../utils/project';
 import type {
   LayoutBlock,
   MediaBlock,
@@ -57,6 +59,8 @@ function Frame({
   aspect?: string;
   onClick?: () => void;
 }) {
+  const { language } = useLanguage();
+  const caption = img.caption ? pickL(img.caption, language) : undefined;
   return (
     <figure>
       <button
@@ -79,7 +83,7 @@ function Frame({
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
         />
       </button>
-      {img.caption && (
+      {caption && (
         <figcaption
           className="mt-2 tracking-[0.05em]"
           style={{
@@ -88,7 +92,7 @@ function Frame({
             color: 'var(--site-muted)',
           }}
         >
-          {img.caption}
+          {caption}
         </figcaption>
       )}
     </figure>
@@ -134,6 +138,8 @@ function Lightbox({
   }, []);
 
   const img = images[index];
+  const { language } = useLanguage();
+  const caption = img.caption ? pickL(img.caption, language) : undefined;
 
   return createPortal(
     <div
@@ -206,7 +212,7 @@ function Lightbox({
             display: 'block',
           }}
         />
-        {img.caption && (
+        {caption && (
           <figcaption
             className="tracking-[0.05em] text-center"
             style={{
@@ -216,7 +222,7 @@ function Lightbox({
               maxWidth: '70ch',
             }}
           >
-            {img.caption}
+            {caption}
             {total > 1 && (
               <span style={{ opacity: 0.55, marginLeft: 12 }}>
                 {index + 1} / {total}
@@ -224,7 +230,7 @@ function Lightbox({
             )}
           </figcaption>
         )}
-        {!img.caption && total > 1 && (
+        {!caption && total > 1 && (
           <figcaption
             style={{
               fontFamily: 'var(--font-sans)',

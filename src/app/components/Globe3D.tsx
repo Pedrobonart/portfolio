@@ -24,6 +24,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { projects, Project } from '../data/projects';
 import { useLanguage } from '../context/LanguageContext';
+import { pickL } from '../utils/project';
 
 interface Globe3DProps {
   isDark: boolean;
@@ -176,7 +177,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
   // containerRef is the plain <div> that MapLibre mounts into.
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate     = useNavigate();
-  const { t }        = useLanguage();
+  const { t, language } = useLanguage();
 
   // hoverState drives the preview card; null means no card is shown.
   const [hoverState, setHoverState]   = useState<HoverState | null>(null);
@@ -644,7 +645,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
         >
           <div style={{ width: 280, background: 'var(--site-surface)', border: '1px solid var(--site-border)', boxShadow: '0 12px 40px rgba(0,0,0,0.22)', overflow: 'hidden', cursor: isTouchDevice ? 'pointer' : 'default' }}>
             <div style={{ height: 155, overflow: 'hidden' }}>
-              <img src={hoverState.project.image} alt={hoverState.project.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={hoverState.project.image} alt={pickL(hoverState.project.title, language)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div style={{ padding: '14px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -654,7 +655,7 @@ export function Globe3D({ isDark }: Globe3DProps) {
                 <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-sans)', color: 'var(--site-muted)' }}>{hoverState.project.year}</span>
               </div>
               <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.05rem', fontWeight: 400, lineHeight: 1.3, color: 'var(--site-text)', marginBottom: 4 }}>
-                {hoverState.project.title}
+                {pickL(hoverState.project.title, language)}
               </h3>
               {/* Extra-location sub-label (e.g. "London office" vs "Paris office") */}
               {hoverState.label && (
@@ -664,10 +665,10 @@ export function Globe3D({ isDark }: Globe3DProps) {
                 </p>
               )}
               <p style={{ fontSize: '0.7rem', fontFamily: 'var(--font-sans)', color: 'var(--site-muted)', marginBottom: 10 }}>
-                {hoverState.project.location}, {hoverState.project.country}
+                {pickL(hoverState.project.location, language)}, {pickL(hoverState.project.country, language)}
               </p>
               <p style={{ fontSize: '0.72rem', fontFamily: 'var(--font-sans)', color: 'var(--site-text2)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden', marginBottom: 12 }}>
-                {hoverState.project.shortDescription}
+                {pickL(hoverState.project.shortDescription, language)}
               </p>
             </div>
           </div>

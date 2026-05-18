@@ -11,14 +11,16 @@ import {
   Map,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { typeColor, workTypeLabel } from '../utils/project';
+import { pickL, typeColor, workTypeLabel } from '../utils/project';
 import { LayoutBlocks, MediaBlocks } from '../components/MediaBlocks';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const project = projects.find((p) => p.id === id);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  // Short alias — applied to every Localized<string> read below.
+  const L = <T,>(v: import('../data/projects').Localized<T>) => pickL<T>(v, language);
 
   // Always navigate to /projects — reliable regardless of browser history state
   const handleBack = () => {
@@ -108,7 +110,7 @@ export function ProjectDetail() {
         >
           <img
             src={project.image}
-            alt={project.title}
+            alt={L(project.title)}
             className="w-full h-full object-cover"
           />
         </div>
@@ -159,12 +161,12 @@ export function ProjectDetail() {
               <MetaItem
                 icon={<MapPin size={12} strokeWidth={1.5} />}
                 label={t.detail.location}
-                value={`${project.location}, ${project.country}`}
+                value={`${L(project.location)}, ${L(project.country)}`}
               />
               <MetaItem
                 icon={<User size={12} strokeWidth={1.5} />}
                 label={t.detail.client}
-                value={project.client}
+                value={L(project.client)}
               />
               <MetaItem
                 icon={<Activity size={12} strokeWidth={1.5} />}
@@ -175,14 +177,14 @@ export function ProjectDetail() {
                 <MetaItem
                   icon={<Square size={12} strokeWidth={1.5} />}
                   label={t.detail.area}
-                  value={project.area}
+                  value={L(project.area)}
                 />
               )}
               {project.scale && (
                 <MetaItem
                   icon={<Map size={12} strokeWidth={1.5} />}
                   label={t.detail.scale}
-                  value={project.scale}
+                  value={L(project.scale)}
                 />
               )}
             </div>
@@ -200,7 +202,7 @@ export function ProjectDetail() {
                 {t.detail.tags}
               </p>
               <div className="flex flex-wrap gap-2">
-                {project.tags.map((tag) => (
+                {L(project.tags).map((tag) => (
                   <span
                     key={tag}
                     className="px-3 py-1"
@@ -283,7 +285,7 @@ export function ProjectDetail() {
                 color: 'var(--site-text)',
               }}
             >
-              {project.title}
+              {L(project.title)}
             </h1>
 
             {/* Divider */}
@@ -297,8 +299,8 @@ export function ProjectDetail() {
             {project.layout && project.layout.length > 0 ? (
               <LayoutBlocks
                 blocks={project.layout}
-                description={project.description}
-                details={project.details}
+                description={L(project.description)}
+                details={L(project.details)}
               />
             ) : (
               <div className="space-y-6">
@@ -310,7 +312,7 @@ export function ProjectDetail() {
                     color: 'var(--site-text2)',
                   }}
                 >
-                  {project.description}
+                  {L(project.description)}
                 </p>
 
                 {/* Slot: afterDescription */}
@@ -326,7 +328,7 @@ export function ProjectDetail() {
                     color: 'var(--site-muted)',
                   }}
                 >
-                  {project.details}
+                  {L(project.details)}
                 </p>
 
                 {/* Slot: afterDetails */}
@@ -385,7 +387,7 @@ export function ProjectDetail() {
                 >
                   <img
                     src={related.image}
-                    alt={related.title}
+                    alt={L(related.title)}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
@@ -412,7 +414,7 @@ export function ProjectDetail() {
                       color: 'var(--site-text)',
                     }}
                   >
-                    {related.title}
+                    {L(related.title)}
                   </p>
                   <p
                     className="mt-1"
@@ -422,7 +424,7 @@ export function ProjectDetail() {
                       color: 'var(--site-muted)',
                     }}
                   >
-                    {related.year} · {related.location}
+                    {related.year} · {L(related.location)}
                   </p>
                 </div>
               </button>

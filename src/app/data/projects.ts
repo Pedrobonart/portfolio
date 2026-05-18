@@ -1,6 +1,12 @@
 export type ProjectType = 'architecture' | 'cartography';
 export type WorkType = 'academic' | 'thesis' | 'professional';
 
+// ─── i18n helpers ────────────────────────────────────────────────────────
+// A localized value is either a plain T (used for both languages) or an
+// object with per-language variants. `es` is optional and falls back to `en`.
+// Use `pickL(value, lang)` (src/app/utils/project.ts) to resolve at render.
+export type Localized<T> = T | { en: T; es?: T };
+
 /** A named secondary site for projects that span multiple locations. */
 export interface ProjectLocation {
   /** Short label shown on the globe marker, e.g. "Site A" or "Rotterdam HQ". */
@@ -22,7 +28,7 @@ export type MediaSlot =
 export interface MediaImage {
   src: string;
   alt?: string;
-  caption?: string;
+  caption?: Localized<string>;
 }
 
 interface MediaBlockBase {
@@ -92,11 +98,13 @@ export type LayoutBlock =
 
 export interface Project {
   id: string;
-  title: string;
+  /** Text fields below are `Localized` — pass plain string for english-only,
+   * or `{ en, es }` for bilingual. Resolve with `pickL` at render time. */
+  title: Localized<string>;
   type: ProjectType;
   year: number;
-  location: string;
-  country: string;
+  location: Localized<string>;
+  country: Localized<string>;
   /** Primary / first site coordinates [lat, lng]. */
   coordinates: [number, number];
   /**
@@ -104,13 +112,13 @@ export interface Project {
    * Each entry gets its own marker on the globe.
    */
   extraLocations?: ProjectLocation[];
-  shortDescription: string;
-  description: string;
-  details: string;
-  client: string;
+  shortDescription: Localized<string>;
+  description: Localized<string>;
+  details: Localized<string>;
+  client: Localized<string>;
   workType: WorkType;
-  area?: string;
-  scale?: string;
+  area?: Localized<string>;
+  scale?: Localized<string>;
   /** Hero / thumbnail image — also used in listings, related-project cards. */
   image: string;
   /**
@@ -126,7 +134,9 @@ export interface Project {
    * (afterHero, beforeRelated).
    */
   layout?: LayoutBlock[];
-  tags: string[];
+  /** Filterable tags. Either a plain list (used for both languages) or
+   *  `{ en: [...], es: [...] }` to translate each tag. */
+  tags: Localized<string[]>;
 }
 
 import { csvProjects } from './projects.generated';

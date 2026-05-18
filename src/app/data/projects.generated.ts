@@ -7,28 +7,60 @@ import type { Project } from './projects';
 export const csvProjects: Project[] = [
   {
     "id": "waterfront-cultural-center",
-    "title": "Waterfront Cultural Center",
+    "title": {
+      "en": "Waterfront Cultural Center",
+      "es": "Centro Cultural Ribereño"
+    },
     "type": "architecture",
     "year": 2024,
-    "location": "Rotterdam",
-    "country": "Netherlands",
+    "location": {
+      "en": "Rotterdam",
+      "es": "Róterdam"
+    },
+    "country": {
+      "en": "Netherlands",
+      "es": "Países Bajos"
+    },
     "coordinates": [
       51.9244,
       4.4777
     ],
-    "shortDescription": "A contemporary cultural complex bridging the Nieuwe Maas river and the city's historic port heritage.",
-    "description": "The Waterfront Cultural Center emerges from the tension between Rotterdam's industrial past and its ambition to become a global cultural destination. Situated at the former Rijnhaven dock, the project weaves together three programmatic strands — exhibition, performance, and public gathering — under a continuous folded roof that references the geometry of container stacking.",
-    "details": "The structural system relies on a series of tapered concrete fins that transfer lateral loads to a buried podium, freeing the ground level for uninterrupted public flow between the river promenade and the city interior. Façade elements are clad in cor-ten steel panels that develop a patina mirroring the harbour's aging cranes. The interior circulation is organized along a single spiraling ramp that doubles as gallery space, offering changing viewpoints of the Maas at each level. Daylighting is controlled through a system of motorized louvres calibrated to the north-facing river exposure.",
-    "client": "Municipality of Rotterdam / Kunsthal Foundation",
+    "shortDescription": {
+      "en": "A contemporary cultural complex bridging the Nieuwe Maas river and the city's historic port heritage.",
+      "es": "Un complejo cultural contemporáneo que tiende un puente entre el río Nieuwe Maas y el legado portuario histórico de la ciudad."
+    },
+    "description": {
+      "en": "The Waterfront Cultural Center emerges from the tension between Rotterdam's industrial past and its ambition to become a global cultural destination. Situated at the former Rijnhaven dock, the project weaves together three programmatic strands — exhibition, performance, and public gathering — under a continuous folded roof that references the geometry of container stacking.",
+      "es": "El Centro Cultural Ribereño surge de la tensión entre el pasado industrial de Róterdam y su ambición de convertirse en un destino cultural global. Ubicado en el antiguo muelle de Rijnhaven, el proyecto entrelaza tres líneas programáticas — exposición, espectáculo y encuentro público — bajo una cubierta plegada continua que evoca la geometría del apilamiento de contenedores."
+    },
+    "details": {
+      "en": "The structural system relies on a series of tapered concrete fins that transfer lateral loads to a buried podium, freeing the ground level for uninterrupted public flow between the river promenade and the city interior. Façade elements are clad in cor-ten steel panels that develop a patina mirroring the harbour's aging cranes. The interior circulation is organized along a single spiraling ramp that doubles as gallery space, offering changing viewpoints of the Maas at each level. Daylighting is controlled through a system of motorized louvres calibrated to the north-facing river exposure.",
+      "es": "El sistema estructural se apoya en una serie de aletas de hormigón ahusadas que transfieren las cargas laterales a un podio enterrado, liberando la planta baja para un flujo público ininterrumpido entre el paseo fluvial y el interior de la ciudad. Los elementos de fachada están revestidos con paneles de acero corten que desarrollan una pátina que refleja las grúas envejecidas del puerto. La circulación interior se organiza a lo largo de una única rampa en espiral que sirve también de espacio expositivo, ofreciendo perspectivas cambiantes del Maas en cada nivel. La iluminación natural se controla mediante un sistema de lamas motorizadas calibradas para la exposición norte hacia el río."
+    },
+    "client": {
+      "en": "Municipality of Rotterdam / Kunsthal Foundation",
+      "es": "Municipalidad de Róterdam / Fundación Kunsthal"
+    },
     "workType": "professional",
-    "area": "18,400 m²",
+    "area": {
+      "en": "18,400 m²",
+      "es": "18.400 m²"
+    },
     "image": "https://images.unsplash.com/photo-1773134284411-c3a809aa0965?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3YXRlcmZyb250JTIwY3VsdHVyYWwlMjBjZW50ZXIlMjBhcmNoaXRlY3R1cmV8ZW58MXx8fHwxNzc2OTQ5MzczfDA&ixlib=rb-4.1.0&q=80&w=1080",
-    "tags": [
-      "Cultural",
-      "Public",
-      "Mixed-Use",
-      "Waterfront"
-    ],
+    "tags": {
+      "en": [
+        "Cultural",
+        "Public",
+        "Mixed-Use",
+        "Waterfront"
+      ],
+      "es": [
+        "Cultural",
+        "Público",
+        "Uso Mixto",
+        "Costero"
+      ]
+    },
     "media": [
       {
         "kind": "carousel",
@@ -37,15 +69,24 @@ export const csvProjects: Project[] = [
         "images": [
           {
             "src": "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=80",
-            "caption": "River-side approach"
+            "caption": {
+              "en": "River-side approach",
+              "es": "Acceso desde el río"
+            }
           },
           {
             "src": "https://images.unsplash.com/photo-1496564203457-11bb12075d90?w=1400&q=80",
-            "caption": "Main hall, north light"
+            "caption": {
+              "en": "Main hall, north light",
+              "es": "Sala principal, luz norte"
+            }
           },
           {
             "src": "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=1400&q=80",
-            "caption": "Spiral gallery ramp"
+            "caption": {
+              "en": "Spiral gallery ramp",
+              "es": "Rampa de galería en espiral"
+            }
           }
         ]
       },
@@ -56,11 +97,17 @@ export const csvProjects: Project[] = [
         "images": [
           {
             "src": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=900&q=80",
-            "caption": "Cor-ten façade detail"
+            "caption": {
+              "en": "Cor-ten façade detail",
+              "es": "Detalle de fachada en corten"
+            }
           },
           {
             "src": "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=900&q=80",
-            "caption": "Public plaza"
+            "caption": {
+              "en": "Public plaza",
+              "es": "Plaza pública"
+            }
           }
         ]
       },
@@ -70,7 +117,10 @@ export const csvProjects: Project[] = [
         "size": "full",
         "aspect": "16/9",
         "src": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1600&q=80",
-        "caption": "Long section through the spiraling exhibition ramp."
+        "caption": {
+          "en": "Long section through the spiraling exhibition ramp.",
+          "es": "Sección longitudinal a través de la rampa expositiva en espiral."
+        }
       },
       {
         "kind": "grid",

@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router';
 import { projects, ProjectType } from '../data/projects';
 import { MapPin, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { typeColor, workTypeLabel } from '../utils/project';
+import { pickL, typeColor, workTypeLabel } from '../utils/project';
+import type { Localized } from '../data/projects';
 
 type Filter = 'all' | ProjectType;
 
 export function Projects() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>('all');
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const L = <T,>(v: Localized<T>) => pickL<T>(v, language);
 
   const filtered = projects.filter(
     (p) => filter === 'all' || p.type === filter
@@ -162,7 +164,7 @@ export function Projects() {
                     >
                       <img
                         src={project.image}
-                        alt={project.title}
+                        alt={L(project.title)}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     </div>
@@ -195,7 +197,7 @@ export function Projects() {
                             color: 'var(--site-text)',
                           }}
                         >
-                          {project.title}
+                          {L(project.title)}
                         </h2>
 
                         <div
@@ -210,7 +212,7 @@ export function Projects() {
                               fontFamily: 'var(--font-sans)',
                             }}
                           >
-                            {project.location}, {project.country}
+                            {L(project.location)}, {L(project.country)}
                           </span>
                         </div>
                       </div>
@@ -229,7 +231,7 @@ export function Projects() {
                             color: 'var(--site-muted)',
                           }}
                         >
-                          {project.shortDescription}
+                          {L(project.shortDescription)}
                         </p>
                       </div>
 

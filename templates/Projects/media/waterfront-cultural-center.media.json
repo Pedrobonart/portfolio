@@ -5,9 +5,12 @@
       "slot": "afterHero",
       "aspect": "16/9",
       "images": [
-        { "src": "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=80", "caption": "River-side approach" },
-        { "src": "https://images.unsplash.com/photo-1496564203457-11bb12075d90?w=1400&q=80", "caption": "Main hall, north light" },
-        { "src": "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=1400&q=80", "caption": "Spiral gallery ramp" }
+        { "src": "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1400&q=80",
+          "caption": { "en": "River-side approach", "es": "Acceso desde el río" } },
+        { "src": "https://images.unsplash.com/photo-1496564203457-11bb12075d90?w=1400&q=80",
+          "caption": { "en": "Main hall, north light", "es": "Sala principal, luz norte" } },
+        { "src": "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=1400&q=80",
+          "caption": { "en": "Spiral gallery ramp", "es": "Rampa de galería en espiral" } }
       ]
     },
     {
@@ -15,8 +18,10 @@
       "slot": "afterDescription",
       "aspect": "4/3",
       "images": [
-        { "src": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=900&q=80", "caption": "Cor-ten façade detail" },
-        { "src": "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=900&q=80", "caption": "Public plaza" }
+        { "src": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=900&q=80",
+          "caption": { "en": "Cor-ten façade detail", "es": "Detalle de fachada en corten" } },
+        { "src": "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=900&q=80",
+          "caption": { "en": "Public plaza", "es": "Plaza pública" } }
       ]
     },
     {
@@ -25,7 +30,10 @@
       "size": "full",
       "aspect": "16/9",
       "src": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1600&q=80",
-      "caption": "Long section through the spiraling exhibition ramp."
+      "caption": {
+        "en": "Long section through the spiraling exhibition ramp.",
+        "es": "Sección longitudinal a través de la rampa expositiva en espiral."
+      }
     },
     {
       "kind": "grid",
